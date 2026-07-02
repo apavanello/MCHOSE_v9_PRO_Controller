@@ -558,7 +558,7 @@ class MchoseBatteryApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("MCHOSE V9 PRO")
-        self.geometry("460x880")
+        self.geometry("460x850")
         self.minsize(400, 800)
         self.configure(fg_color=BG)
 
@@ -787,7 +787,7 @@ class MchoseBatteryApp(ctk.CTk):
 
     # ── microphone card ────────────────────────────────────────────
     def _build_mic_card(self):
-        card = self._make_card(row=4, pady_top=6)
+        card = self._make_card(row=4, pady_top=8)
 
         # Header row
         header = ctk.CTkFrame(card, fg_color="transparent")
@@ -808,9 +808,13 @@ class MchoseBatteryApp(ctk.CTk):
             text_color=TEXT_PRIMARY,
         ).pack(side="left")
 
+        # Container for switch and percentage on the right
+        right_frame = ctk.CTkFrame(header, fg_color="transparent")
+        right_frame.pack(side="right")
+
         # Mute switch
         self._mic_switch = ctk.CTkSwitch(
-            header,
+            right_frame,
             text="Mudo",
             onvalue=1,
             offvalue=0,
@@ -821,21 +825,18 @@ class MchoseBatteryApp(ctk.CTk):
             progress_color=ACCENT_RED,
             text_color=TEXT_SECONDARY,
         )
-        self._mic_switch.pack(side="right")
+        self._mic_switch.pack(side="left", padx=(0, 16))
         if self.mic_muted:
             self._mic_switch.select()
 
-        # Mic volume label row
-        mic_vol_frame = ctk.CTkFrame(card, fg_color="transparent")
-        mic_vol_frame.pack(fill="x", padx=20, pady=(10, 0))
-
+        # Percentage label
         self._mic_pct = ctk.CTkLabel(
-            mic_vol_frame,
+            right_frame,
             text="50%",
-            font=("Helvetica", 12, "bold"),
-            text_color=ACCENT_GREEN,
+            font=("Helvetica", 14, "bold"),
+            text_color=ACCENT_RED if self.mic_muted else ACCENT_GREEN,
         )
-        self._mic_pct.pack(side="right")
+        self._mic_pct.pack(side="left")
 
         # Slider
         self._mic_slider = ctk.CTkSlider(
@@ -853,7 +854,7 @@ class MchoseBatteryApp(ctk.CTk):
             corner_radius=10,
         )
         self._mic_slider.set(self.mic_level)
-        self._mic_slider.pack(fill="x", padx=20, pady=(10, 16))
+        self._mic_slider.pack(fill="x", padx=20, pady=(12, 16))
         self._mic_slider.bind(
             "<ButtonRelease-1>", lambda e: setattr(self, "_dragging_mic", False)
         )
