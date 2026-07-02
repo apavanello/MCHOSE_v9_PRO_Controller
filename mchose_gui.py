@@ -1166,7 +1166,7 @@ class MchoseBatteryApp(ctk.CTk):
             ["amixer", "sget", "Master" if sink else "Capture"],
         ):
             try:
-                out = subprocess.check_output(cmd, text=True)
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
                 m = re.search(r"(?:Volume:\s*|(\d+)%)", out)
                 if m:
                     val = m.group(1)
@@ -1206,7 +1206,7 @@ class MchoseBatteryApp(ctk.CTk):
             ["amixer", "sget", "Mic"],
         ):
             try:
-                out = subprocess.check_output(cmd, text=True)
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
                 if "[MUTED]" in out or "[off]" in out:
                     return True
             except Exception:
