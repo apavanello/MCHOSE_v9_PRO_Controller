@@ -833,6 +833,8 @@ class MchoseBatteryApp(ctk.CTk):
         self._mic_pct = ctk.CTkLabel(
             right_frame,
             text="50%",
+            width=45,
+            anchor="e",
             font=("Helvetica", 14, "bold"),
             text_color=ACCENT_RED if self.mic_muted else ACCENT_GREEN,
         )
@@ -861,18 +863,20 @@ class MchoseBatteryApp(ctk.CTk):
 
     def _on_mic_switch(self):
         self.mic_muted = bool(self._mic_switch.get())
-        color = ACCENT_RED if self.mic_muted else ACCENT_GREEN
-        self._mic_icon_cv.configure(
-            image=icon_mic_muted(18, color) if self.mic_muted else icon_mic(18, color)
-        )
-        self._mic_switch.configure(
-            button_color=color,
-            button_hover_color="#fca5a5" if self.mic_muted else "#6ee7b7",
-        )
-        self._mic_pct.configure(text_color=color)
+        if self.mic_muted:
+            if self.mic_level == 0:
+                self.mic_level = 50
+        else:
+            if self.mic_level == 0:
+                self.mic_level = 50
+
+        self._update_mic_visuals()
+
         threading.Thread(
             target=self._set_sys_mic_mute, args=(self.mic_muted,), daemon=True
         ).start()
+        if not self.mic_muted:
+            threading.Thread(target=self._set_sys_vol, args=(self.mic_level, False), daemon=True).start()
 
     def _on_mic_slide(self, val):
         self._dragging_mic = True
@@ -880,9 +884,107 @@ class MchoseBatteryApp(ctk.CTk):
 
     def _on_mic_change(self, val):
         v = int(val)
-        self.mic_level = v
-        self._mic_pct.configure(text=f"{v}%")
+        if v > 0:
+            self.mic_level = v
+            if self.mic_muted:
+                self.mic_muted = False
+                threading.Thread(target=self._set_sys_mic_mute, args=(False,), daemon=True).start()
+        else:
+            if not self.mic_muted:
+                self.mic_muted = True
+                threading.Thread(target=self._set_sys_mic_mute, args=(True,), daemon=True).start()
+
+        self._update_mic_visuals()
         threading.Thread(target=self._set_sys_vol, args=(v, False), daemon=True).start()
+
+    def _update_mic_visuals(self):
+        is_red = self.mic_muted or (self.mic_level == 0)
+        color = ACCENT_RED if is_red else ACCENT_GREEN
+        hover = "#fca5a5" if is_red else "#6ee7b7"
+
+        # 1. Update icon
+        self._mic_icon_cv.configure(
+            image=icon_mic_muted(18, color) if is_red else icon_mic(18, color)
+        )
+
+        # 2. Update mute switch
+        if self.mic_muted:
+            if not self._mic_switch.get():
+                self._mic_switch.select()
+        else:
+            if self._mic_switch.get():
+                self._mic_switch.deselect()
+
+        self._mic_switch.configure(
+            button_color=color,
+            button_hover_color=hover,
+        )
+
+        # 3. Update percentage label
+        self._mic_pct.configure(
+            text="0%" if self.mic_muted else f"{self.mic_level}%",
+            text_color=color
+        )
+
+        # 4. Update slider
+        slider_val = 0 if self.mic_muted else self.mic_level
+        if not self._dragging_mic and not getattr(self, "_animating_mic_slider", False):
+            start_val = int(self._mic_slider.get())
+            if not start_val == slider_val:
+                if abs(start_val - slider_val) > 5:
+                    self._animate_mic_slider(start_val, slider_val)
+                else:
+                    self._mic_slider.set(slider_val)
+
+        self._mic_slider.configure(
+            button_color=color,
+            button_hover_color=hover,
+            progress_color=color
+        )
+
+    def _animate_mic_slider(self, start_val, target_val):
+        self._animating_mic_slider = True
+        steps = 15
+        delay = 12
+
+        vals = []
+        for i in range(1, steps + 1):
+            t = i / steps
+            ease = 1 - (1 - t) ** 3
+            val = int(start_val + (target_val - start_val) * ease)
+            vals.append(val)
+
+        def run_step(index):
+            if index >= len(vals):
+                self._animating_mic_slider = False
+                return
+            if not self._dragging_mic:
+                self._mic_slider.set(vals[index])
+            self.after(delay, lambda: run_step(index + 1))
+
+        run_step(0)
+
+    def _animate_vol_slider(self, start_val, target_val):
+        self._animating_vol_slider = True
+        steps = 15
+        delay = 12
+
+        vals = []
+        for i in range(1, steps + 1):
+            t = i / steps
+            ease = 1 - (1 - t) ** 3
+            val = int(start_val + (target_val - start_val) * ease)
+            vals.append(val)
+
+        def run_step(index):
+            if index >= len(vals):
+                self._animating_vol_slider = False
+                return
+            if not self._dragging_vol:
+                self._vol_slider.set(vals[index])
+            self.after(delay, lambda: run_step(index + 1))
+
+        run_step(0)
 
     # ── equalizer card ─────────────────────────────────────────────
     def _build_eq_card(self):
@@ -1094,29 +1196,17 @@ class MchoseBatteryApp(ctk.CTk):
         self._fw_label.configure(text=fw)
 
         # volume slider
-        if not self._vol_slider.get() == self.volume_level:
-            self._vol_slider.set(self.volume_level)
+        if not self._dragging_vol and not getattr(self, "_animating_vol_slider", False):
+            start_val = int(self._vol_slider.get())
+            if not start_val == self.volume_level:
+                if abs(start_val - self.volume_level) > 5:
+                    self._animate_vol_slider(start_val, self.volume_level)
+                else:
+                    self._vol_slider.set(self.volume_level)
         self._vol_pct.configure(text=f"{self.volume_level}%")
 
         # mic
-        self._mic_slider.set(self.mic_level)
-        self._mic_pct.configure(text=f"{self.mic_level}%")
-        if self.mic_muted:
-            if not self._mic_switch.get():
-                self._mic_switch.select()
-            self._mic_icon_cv.configure(image=icon_mic_muted(18, ACCENT_RED))
-            self._mic_switch.configure(
-                button_color=ACCENT_RED, button_hover_color="#fca5a5"
-            )
-            self._mic_pct.configure(text_color=ACCENT_RED)
-        else:
-            if self._mic_switch.get():
-                self._mic_switch.deselect()
-            self._mic_icon_cv.configure(image=icon_mic(18, ACCENT_GREEN))
-            self._mic_switch.configure(
-                button_color=ACCENT_GREEN, button_hover_color="#6ee7b7"
-            )
-            self._mic_pct.configure(text_color=ACCENT_GREEN)
+        self._update_mic_visuals()
 
         self._update_eq_buttons()
 
@@ -1385,7 +1475,9 @@ class MchoseBatteryApp(ctk.CTk):
             self.volume_level = self._get_sys_vol(sink=True)
         self.mic_muted = self._get_sys_mic_mute()
         if not self._dragging_mic:
-            self.mic_level = self._get_sys_vol(sink=False)
+            lvl = self._get_sys_vol(sink=False)
+            if lvl > 0:
+                self.mic_level = lvl
 
     # ═══════════════════════════════════════════════════════════════════
     # Poll thread
