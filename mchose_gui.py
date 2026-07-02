@@ -7,7 +7,7 @@ import threading
 import time
 import tkinter as tk
 import customtkinter as ctk
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import io
 import base64
 
@@ -23,7 +23,6 @@ _SCALE = 4
 
 
 def _make(draw_fn, size=24, color="#e2e4e9"):
-    """Create a CTkImage by drawing at 4x then downscaling."""
     px = size * _SCALE
     img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -33,9 +32,8 @@ def _make(draw_fn, size=24, color="#e2e4e9"):
 
 
 # ── Speaker / Volume ──────────────────────────────────────────────
-def icon_speaker(size=24, color="#4a9eff"):
+def icon_speaker(size=24, color="#60a5fa"):
     def draw(d, s, c):
-        # speaker body
         d.polygon(
             [
                 (s * 0.16, s * 0.38),
@@ -47,42 +45,22 @@ def icon_speaker(size=24, color="#4a9eff"):
             ],
             fill=c,
         )
-        # 3 sound waves (concentric arcs on the right side)
         w = max(2, int(s * 0.05))
-        cx = s * 0.38
-        cy = s * 0.50
-        # Arc 1
-        d.arc(
-            [cx - s * 0.22, cy - s * 0.22, cx + s * 0.22, cy + s * 0.22],
-            -45,
-            45,
-            fill=c,
-            width=w,
-        )
-        # Arc 2
-        d.arc(
-            [cx - s * 0.35, cy - s * 0.35, cx + s * 0.35, cy + s * 0.35],
-            -45,
-            45,
-            fill=c,
-            width=w,
-        )
-        # Arc 3
-        d.arc(
-            [cx - s * 0.48, cy - s * 0.48, cx + s * 0.48, cy + s * 0.48],
-            -45,
-            45,
-            fill=c,
-            width=w,
-        )
+        cx, cy = s * 0.38, s * 0.50
+        for f in [0.22, 0.35, 0.48]:
+            d.arc(
+                [cx - s * f, cy - s * f, cx + s * f, cy + s * f],
+                -45,
+                45,
+                fill=c,
+                width=w,
+            )
 
     return _make(draw, size, color)
 
 
-# ── Speaker muted ─────────────────────────────────────────────────
 def icon_speaker_muted(size=24, color="#f87171"):
     def draw(d, s, c):
-        # speaker body
         d.polygon(
             [
                 (s * 0.16, s * 0.38),
@@ -94,7 +72,6 @@ def icon_speaker_muted(size=24, color="#f87171"):
             ],
             fill=c,
         )
-        # elegant 'X' on the right representing muted
         w = max(2, int(s * 0.06))
         d.line([(s * 0.62, s * 0.42), (s * 0.74, s * 0.58)], fill=c, width=w)
         d.line([(s * 0.62, s * 0.58), (s * 0.74, s * 0.42)], fill=c, width=w)
@@ -103,39 +80,10 @@ def icon_speaker_muted(size=24, color="#f87171"):
 
 
 # ── Microphone ────────────────────────────────────────────────────
-def icon_mic(size=24, color="#4ade80"):
+def icon_mic(size=24, color="#34d399"):
     def draw(d, s, c):
         w = max(2, int(s * 0.05))
-        # mic capsule (rounded top)
-        cx = s * 0.50
-        cap_r = s * 0.16
-        cap_top = s * 0.12
-        cap_bot = s * 0.48
-        d.rounded_rectangle(
-            [cx - cap_r, cap_top, cx + cap_r, cap_bot], radius=int(cap_r), fill=c
-        )
-        # holder arc
-        arc_r = s * 0.26
-        d.arc(
-            [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
-            0,
-            180,
-            fill=c,
-            width=max(2, int(s * 0.05)),
-        )
-        # stand
-        d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
-        d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
-
-    return _make(draw, size, color)
-
-
-# ── Microphone muted ──────────────────────────────────────────────
-def icon_mic_muted(size=24, color="#f87171"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.05))
-        cx = s * 0.50
-        cap_r = s * 0.16
+        cx, cap_r = s * 0.50, s * 0.16
         d.rounded_rectangle(
             [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
         )
@@ -149,7 +97,27 @@ def icon_mic_muted(size=24, color="#f87171"):
         )
         d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
         d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
-        # slash
+
+    return _make(draw, size, color)
+
+
+def icon_mic_muted(size=24, color="#f87171"):
+    def draw(d, s, c):
+        w = max(2, int(s * 0.05))
+        cx, cap_r = s * 0.50, s * 0.16
+        d.rounded_rectangle(
+            [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
+        )
+        arc_r = s * 0.26
+        d.arc(
+            [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
+            0,
+            180,
+            fill=c,
+            width=max(2, int(s * 0.05)),
+        )
+        d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
+        d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
         d.line(
             [(s * 0.12, s * 0.88), (s * 0.88, s * 0.12)],
             fill=c,
@@ -160,43 +128,34 @@ def icon_mic_muted(size=24, color="#f87171"):
 
 
 # ── Equalizer ─────────────────────────────────────────────────────
-def icon_equalizer(size=24, color="#f0c040"):
+def icon_equalizer(size=24, color="#fbbf24"):
     def draw(d, s, c):
         w = max(2, int(s * 0.05))
-        d.line([(s * 0.28, s * 0.20), (s * 0.28, s * 0.80)], fill=c, width=w)
-        d.line([(s * 0.50, s * 0.20), (s * 0.50, s * 0.80)], fill=c, width=w)
-        d.line([(s * 0.72, s * 0.20), (s * 0.72, s * 0.80)], fill=c, width=w)
+        for x in [0.28, 0.50, 0.72]:
+            d.line([(s * x, s * 0.20), (s * x, s * 0.80)], fill=c, width=w)
         r = s * 0.08
-        d.ellipse([s * 0.28 - r, s * 0.60 - r, s * 0.28 + r, s * 0.60 + r], fill=c)
-        d.ellipse([s * 0.50 - r, s * 0.35 - r, s * 0.50 + r, s * 0.35 + r], fill=c)
-        d.ellipse([s * 0.72 - r, s * 0.50 - r, s * 0.72 + r, s * 0.50 + r], fill=c)
+        for x, y in [(0.28, 0.60), (0.50, 0.35), (0.72, 0.50)]:
+            d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
 
     return _make(draw, size, color)
 
 
 # ── WiFi / Wireless Signal ─────────────────────────────────────────
-def icon_wifi(size=24, color="#4ade80"):
+def icon_wifi(size=24, color="#34d399"):
     def draw(d, s, c):
         w = max(2, int(s * 0.05))
-        cx = s * 0.50
-        cy = s * 0.72
+        cx, cy = s * 0.50, s * 0.72
         r = s * 0.06
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-        for rad_factor in [0.20, 0.40, 0.60]:
-            rad = s * rad_factor
-            d.arc(
-                [cx - rad, cy - rad, cx + rad, cy + rad],
-                220,
-                320,
-                fill=c,
-                width=w,
-            )
+        for rf in [0.20, 0.40, 0.60]:
+            rad = s * rf
+            d.arc([cx - rad, cy - rad, cx + rad, cy + rad], 220, 320, fill=c, width=w)
 
     return _make(draw, size, color)
 
 
 # ── Bluetooth ─────────────────────────────────────────────────────
-def icon_bluetooth(size=24, color="#4a9eff"):
+def icon_bluetooth(size=24, color="#818cf8"):
     def draw(d, s, c):
         w = max(2, int(s * 0.08))
         d.line(
@@ -220,22 +179,17 @@ def icon_bluetooth(size=24, color="#4a9eff"):
 def icon_gamepad(size=24, color="#e2e4e9"):
     def draw(d, s, c):
         w = max(2, int(s * 0.06))
-        # controller outline
         d.rounded_rectangle(
             [s * 0.12, s * 0.28, s * 0.88, s * 0.72],
             radius=int(s * 0.16),
             outline=c,
             width=w,
         )
-        # d-pad (cross)
         d.line([(s * 0.28, s * 0.40), (s * 0.28, s * 0.60)], fill=c, width=w)
         d.line([(s * 0.18, s * 0.50), (s * 0.38, s * 0.50)], fill=c, width=w)
-        # 4 action buttons on the right (represented by small dots)
         r = s * 0.045
-        d.ellipse([s * 0.68 - r, s * 0.42 - r, s * 0.68 + r, s * 0.42 + r], fill=c)
-        d.ellipse([s * 0.78 - r, s * 0.50 - r, s * 0.78 + r, s * 0.50 + r], fill=c)
-        d.ellipse([s * 0.68 - r, s * 0.58 - r, s * 0.68 + r, s * 0.58 + r], fill=c)
-        d.ellipse([s * 0.58 - r, s * 0.50 - r, s * 0.58 + r, s * 0.50 + r], fill=c)
+        for x, y in [(0.68, 0.42), (0.78, 0.50), (0.68, 0.58), (0.58, 0.50)]:
+            d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
 
     return _make(draw, size, color)
 
@@ -245,13 +199,10 @@ def icon_target(size=24, color="#e2e4e9"):
     def draw(d, s, c):
         w = max(2, int(s * 0.06))
         cx = cy = s * 0.50
-        # outer circle
         r = s * 0.32
         d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=c, width=w)
-        # center dot
         cr = s * 0.05
         d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=c)
-        # 4 short crosshair ticks on the edges
         d.line([(cx, cy - r - s * 0.10), (cx, cy - r + s * 0.06)], fill=c, width=w)
         d.line([(cx, cy + r - s * 0.06), (cx, cy + r + s * 0.10)], fill=c, width=w)
         d.line([(cx - r - s * 0.10, cy), (cx - r + s * 0.06, cy)], fill=c, width=w)
@@ -264,14 +215,10 @@ def icon_target(size=24, color="#e2e4e9"):
 def icon_music(size=24, color="#e2e4e9"):
     def draw(d, s, c):
         w = max(2, int(s * 0.06))
-        # Note 1 head (left)
         d.ellipse([s * 0.18, s * 0.60, s * 0.38, s * 0.76], fill=c)
-        # Note 2 head (right)
         d.ellipse([s * 0.52, s * 0.50, s * 0.72, s * 0.66], fill=c)
-        # Stems
         d.line([(s * 0.38, s * 0.68), (s * 0.38, s * 0.22)], fill=c, width=w)
         d.line([(s * 0.72, s * 0.58), (s * 0.72, s * 0.12)], fill=c, width=w)
-        # Connecting beam (slanted bar at the top)
         beam_w = max(3, int(s * 0.12))
         d.line([(s * 0.38, s * 0.22), (s * 0.72, s * 0.12)], fill=c, width=beam_w)
 
@@ -282,39 +229,27 @@ def icon_music(size=24, color="#e2e4e9"):
 def icon_headset(size=24, color="#e2e4e9"):
     def draw(d, s, c):
         w = max(2, int(s * 0.06))
-        cx = s * 0.50
-        cy = s * 0.50
-
-        # Headband arc (upper half circle)
+        cx, cy = s * 0.50, s * 0.50
         hb_r = s * 0.30
         d.arc([cx - hb_r, cy - hb_r, cx + hb_r, cy + hb_r], 180, 360, fill=c, width=w)
-
-        # Left and Right ear cups
         cup_w = s * 0.12
         cup_y1 = cy - s * 0.05
         cup_y2 = cy + s * 0.23
-
-        # Left cup
         d.rounded_rectangle(
             [cx - hb_r - cup_w / 2, cup_y1, cx - hb_r + cup_w / 2, cup_y2],
             radius=int(cup_w / 2),
             fill=c,
         )
-
-        # Right cup
         d.rounded_rectangle(
             [cx + hb_r - cup_w / 2, cup_y1, cx + hb_r + cup_w / 2, cup_y2],
             radius=int(cup_w / 2),
             fill=c,
         )
-
-        # Mic boom (extending from left cup)
         d.line(
             [cx - hb_r, cy + s * 0.12, cx - s * 0.12, cy + s * 0.32],
             fill=c,
             width=max(2, int(w * 0.7)),
         )
-        # Mic tip
         r = s * 0.05
         d.ellipse(
             [
@@ -330,7 +265,7 @@ def icon_headset(size=24, color="#e2e4e9"):
 
 
 # ── Battery Status Icon ────────────────────────────────────────────
-def icon_battery_status(size=16, color="#4ade80"):
+def icon_battery_status(size=16, color="#34d399"):
     def draw(d, s, c):
         w = max(1.5, s * 0.08)
         d.rounded_rectangle(
@@ -353,7 +288,7 @@ def icon_battery_status(size=16, color="#4ade80"):
 
 
 # ── Lightning Bolt ────────────────────────────────────────────────
-def icon_lightning(size=16, color="#f59e0b"):
+def icon_lightning(size=16, color="#fbbf24"):
     def draw(d, s, c):
         d.polygon(
             [
@@ -371,7 +306,7 @@ def icon_lightning(size=16, color="#f59e0b"):
 
 
 # ── Checkmark ─────────────────────────────────────────────────────
-def icon_check(size=16, color="#4ade80"):
+def icon_check(size=16, color="#34d399"):
     def draw(d, s, c):
         w = max(2, int(s * 0.10))
         d.line(
@@ -385,10 +320,10 @@ def icon_check(size=16, color="#4ade80"):
 
 
 # ── Crescent Moon ─────────────────────────────────────────────────
-def icon_moon(size=16, color="#9ca3af"):
+def icon_moon(size=16, color="#64748b"):
     def draw(d, s, c):
         d.ellipse([s * 0.24, s * 0.24, s * 0.76, s * 0.76], fill=c)
-        d.ellipse([s * 0.38, s * 0.20, s * 0.82, s * 0.72], fill="#1e2227")
+        d.ellipse([s * 0.38, s * 0.20, s * 0.82, s * 0.72], fill="#0f1318")
 
     return _make(draw, size, color)
 
@@ -403,25 +338,48 @@ def icon_cross(size=16, color="#f87171"):
     return _make(draw, size, color)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Color Palette — Refined dark theme (2024+)
+# ═══════════════════════════════════════════════════════════════════════════
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
 
-# Palette
-BG = "#0f1117"
-CARD_BG = "#1a1d26"
-CARD_BORDER = "#2a2d38"
-ACCENT_GOLD = "#f0c040"
-ACCENT_BLUE = "#4a9eff"
-ACCENT_GREEN = "#4ade80"
-ACCENT_RED = "#f87171"
-TEXT_WHITE = "#e2e4e9"
-TEXT_DIM = "#6b7280"
-TEXT_SEC = "#9ca3af"
+# ── Background & Surface ──────────────────────────────────────────
+BG = "#0b0e14"  # Deep rich dark (main background)
+SURFACE_1 = "#131720"  # Card surface (primary)
+SURFACE_2 = "#1a1f2b"  # Card surface (elevated/hover)
+SURFACE_3 = "#222838"  # Subtle overlay / secondary surface
+BORDER = "#1e2433"  # Very subtle borders
+BORDER_HOVER = "#2a3148"  # Borders on hover
+
+# ── Accent Colors (Refined, modern) ──────────────────────────────
+ACCENT_BLUE = "#60a5fa"  # Soft sky blue (volume, primary actions)
+ACCENT_BLUE_DIM = "#3b82f6"  # Slightly deeper blue
+ACCENT_INDIGO = "#818cf8"  # Indigo (bluetooth, secondary)
+ACCENT_GREEN = "#34d399"  # Emerald green (connected, positive)
+ACCENT_GREEN_DIM = "#10b981"
+ACCENT_GOLD = "#fbbf24"  # Warm amber/gold (equalizer, highlights)
+ACCENT_RED = "#f87171"  # Soft red (muted, errors, warning)
+ACCENT_ORANGE = "#fb923c"  # Orange (charging)
+ACCENT_PURPLE = "#a78bfa"  # Purple (secondary accent)
+ACCENT_TEAL = "#2dd4bf"  # Teal accent
+
+# ── Text Colors ───────────────────────────────────────────────────
+TEXT_PRIMARY = "#f1f5f9"  # Main text (near white)
+TEXT_SECONDARY = "#94a3b8"  # Secondary text (slate)
+TEXT_MUTED = "#475569"  # Muted / disabled text
+TEXT_DIM = "#334155"  # Very dim text
+TEXT_ON_ACCENT = "#ffffff"  # Text on accent backgrounds
+
+# ── Glow & Shadow Colors ──────────────────────────────────────────
+GLOW_BLUE = "#1e3a5f"  # Blue glow background
+GLOW_GREEN = "#064e3b"  # Green glow
+GLOW_RED = "#450a0a"  # Red glow
+GLOW_GOLD = "#451a03"  # Gold glow
 
 
 # ── Battery color gradient (green → yellow → red) ───────────────────────────
 def _lerp_rgb(c1, c2, t):
-    """Linear interpolation between two RGB tuples (t in 0..1)."""
     return (
         c1[0] + (c2[0] - c1[0]) * t,
         c1[1] + (c2[1] - c1[1]) * t,
@@ -430,59 +388,123 @@ def _lerp_rgb(c1, c2, t):
 
 
 def _battery_color(pct: int) -> str:
-    """Map a battery percentage (0–100) to a smooth gradient hex color.
-
-    100% → green, 50% → yellow, 0% → red. The tone transitions gradually as the
-    level drops, so the ring never changes color abruptly.
-    """
     pct = max(0, min(100, int(pct)))
-    _GREEN = (74, 222, 128)   # #4ade80  (100%)
-    _YELLOW = (250, 204, 21)  # #facc15  (50%)
-    _RED = (248, 113, 113)    # #f87171  (0%)
+    _GREEN = (52, 211, 153)  # #34d399
+    _YELLOW = (251, 191, 36)  # #fbbf24
+    _RED = (248, 113, 113)  # #f87171
     if pct >= 50:
-        # green (100%) drifting toward yellow (50%)
         t = (100 - pct) / 50.0
         r, g, b = _lerp_rgb(_GREEN, _YELLOW, t)
     else:
-        # yellow (50%) drifting toward red (0%)
         t = (50 - pct) / 50.0
         r, g, b = _lerp_rgb(_YELLOW, _RED, t)
     return f"#{int(round(r)):02x}{int(round(g)):02x}{int(round(b)):02x}"
 
 
+def _hex_to_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+
+
+def _gradient_color(pct):
+    pct = max(0, min(100, int(pct)))
+    # Define gradient stops: 100% green, 50% yellow, 0% red
+    stops = [
+        (100, _hex_to_rgb("#34d399")),
+        (70, _hex_to_rgb("#6ee7b7")),
+        (50, _hex_to_rgb("#fbbf24")),
+        (30, _hex_to_rgb("#fb923c")),
+        (0, _hex_to_rgb("#f87171")),
+    ]
+    for i in range(len(stops) - 1):
+        p1, c1 = stops[i]
+        p2, c2 = stops[i + 1]
+        if pct >= p2:
+            t = (p1 - pct) / (p1 - p2) if p1 != p2 else 0
+            r = int(c1[0] + (c2[0] - c1[0]) * t)
+            g = int(c1[1] + (c2[1] - c1[1]) * t)
+            b = int(c1[2] + (c2[2] - c1[2]) * t)
+            return r, g, b
+    return stops[-1][1]
+
+
 class BatteryRing(tk.Canvas):
-    """Lightweight canvas that draws a circular battery arc."""
 
     def __init__(self, master, size=180, **kw):
         super().__init__(
-            master, width=size, height=size, bg=CARD_BG, highlightthickness=0, **kw
+            master, width=size, height=size, bg=SURFACE_1, highlightthickness=0, **kw
         )
         self._size = size
         self._pct = 0
-        self._color = ACCENT_GREEN
+        self._color = "#34d399"
+        self._anim_pct = 0
+        self._target_pct = 0
+        self._animating = False
 
-    # ── public helpers ─────────────────────────────────────────────────
-    def set_value(self, pct: int, color: str = ACCENT_GREEN):
+    def set_value(self, pct: int, color: str = "#34d399"):
         self._pct = max(0, min(100, pct))
         self._color = color
-        self._draw()
+        self._target_pct = self._pct
+        # Start animation if not already running
+        if not self._animating:
+            self._animate_to(self._target_pct)
 
-    # ── internal draw ──────────────────────────────────────────────────
+    def _animate_to(self, target):
+        # Update target if a new value arrived
+        target = self._target_pct
+        diff = target - self._anim_pct
+        if abs(diff) < 1:
+            self._anim_pct = target
+            self._animating = False
+            self._draw()
+            return
+        self._anim_pct += diff * 0.15
+        self._draw()
+        self._animating = True
+        self.after(16, lambda: self._animate_to(self._target_pct))
+
     def _draw(self):
         self.delete("all")
         s = self._size
         cx = cy = s // 2
-        pad = 12
+        pad = 14
         r = (s - 2 * pad) // 2
-        w = max(6, int(r * 0.16))
+        w = max(6, int(r * 0.14))
 
-        # track
-        self.create_oval(cx - r, cy - r, cx + r, cy + r, outline="#2a2d38", width=w)
-        # filled arc
-        if self._pct > 0:
-            extent = -self._pct * 3.6
+        # ── Glow effect (subtle shadow behind the arc) ──
+        glow_r = r + 4
+        if self._anim_pct > 0:
+            try:
+                glow_img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+                gd = ImageDraw.Draw(glow_img)
+                extent = -self._anim_pct * 3.6
+                if extent <= -360:
+                    extent = -359.99
+                rgb = _hex_to_rgb(self._color)
+                gd.arc(
+                    [cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r],
+                    start=270,
+                    end=270 + (self._anim_pct * 3.6),
+                    fill=(*rgb, 40),
+                    width=w + 8,
+                )
+                glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=6))
+                self._glow_photo = ctk.CTkImage(
+                    light_image=glow_img, dark_image=glow_img, size=(s, s)
+                )
+                self.create_image(0, 0, anchor="nw", image=self._glow_photo)
+            except Exception:
+                pass
+
+        # ── Track (background ring) ──
+        self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=BORDER, width=w)
+
+        # ── Gradient arc ──
+        if self._anim_pct > 0:
+            extent = -self._anim_pct * 3.6
             if extent <= -360:
                 extent = -359.99
+            # Draw the main arc
             self.create_arc(
                 cx - r,
                 cy - r,
@@ -494,29 +516,53 @@ class BatteryRing(tk.Canvas):
                 width=w,
                 style="arc",
             )
-        # percentage text
-        font_size = max(20, int(r * 0.52))
+
+        # ── Center content ──
+        # Subtle background circle
+        inner_r = r - w - 8
+        if inner_r > 0:
+            self.create_oval(
+                cx - inner_r,
+                cy - inner_r,
+                cx + inner_r,
+                cy + inner_r,
+                fill="#0d1017",
+                outline="",
+            )
+
+        # Percentage text
+        font_size = max(22, int(r * 0.48))
         self.create_text(
             cx,
-            cy,
-            text=f"{self._pct}%",
-            fill=TEXT_WHITE,
+            cy - 4,
+            text=f"{int(self._anim_pct)}%",
+            fill=TEXT_PRIMARY,
             font=("Helvetica", font_size, "bold"),
+        )
+
+        # "BATERIA" label below
+        label_size = max(8, int(r * 0.16))
+        self.create_text(
+            cx,
+            cy + font_size * 0.55,
+            text="BATERIA",
+            fill=TEXT_MUTED,
+            font=("Helvetica", label_size, "normal"),
         )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Main application
+# Modern Main Application
 # ═══════════════════════════════════════════════════════════════════════════
 class MchoseBatteryApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("MCHOSE V9 PRO")
-        self.geometry("420x720")
-        self.minsize(360, 620)
+        self.geometry("460x880")
+        self.minsize(400, 800)
         self.configure(fg_color=BG)
 
-        # ── state ─────────────────────────────────────────────────────
+        # ── state ─────────────────────────────────────────────────
         self.battery_level = 0
         self.status_code = 0
         self.connected = False
@@ -530,14 +576,14 @@ class MchoseBatteryApp(ctk.CTk):
         self._dragging_vol = False
         self._dragging_mic = False
 
-        # ── HID ───────────────────────────────────────────────────────
+        # ── HID ───────────────────────────────────────────────────
         self.hid = None
         self._init_hid()
 
-        # ── UI ────────────────────────────────────────────────────────
+        # ── UI ────────────────────────────────────────────────────
         self._build_ui()
 
-        # ── auto-poll thread ──────────────────────────────────────────
+        # ── auto-poll thread ──────────────────────────────────────
         self._stop = False
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
@@ -545,97 +591,170 @@ class MchoseBatteryApp(ctk.CTk):
         # initial read
         self._refresh_system_audio()
 
-    # ───────────────────────────────────────────────────────────────────
+    # ───────────────────────────────────────────────────────────────
     # UI construction
-    # ───────────────────────────────────────────────────────────────────
+    # ───────────────────────────────────────────────────────────────
     def _build_ui(self):
-        # static main container
+        # Scrollable main container
         self._main = ctk.CTkFrame(self, fg_color=BG)
         self._main.pack(fill="both", expand=True, padx=0, pady=0)
         self._main.columnconfigure(0, weight=1)
 
         self._build_header()
+        self._build_battery_section()
+        self._build_connection_section()
         self._build_volume_card()
         self._build_mic_card()
         self._build_eq_card()
-        self._build_footer()
 
-    # ── header ─────────────────────────────────────────────────────────
+    # ── header ─────────────────────────────────────────────────────
     def _build_header(self):
         frame = ctk.CTkFrame(
             self._main,
-            fg_color=CARD_BG,
-            corner_radius=16,
-            border_width=1,
-            border_color=CARD_BORDER,
+            fg_color="transparent",
         )
-        frame.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
+        frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(28, 0))
         frame.columnconfigure(0, weight=1)
 
-        # title
+        # Top accent line (decorative)
+        accent_bar = ctk.CTkFrame(
+            frame, fg_color=ACCENT_BLUE, height=3, corner_radius=2
+        )
+        accent_bar.grid(row=0, column=0, sticky="ew", pady=(0, 20))
+
+        # Product name
         ctk.CTkLabel(
             frame,
-            text="MCHOSE V9 PRO",
-            font=("Helvetica", 20, "bold"),
-            text_color=ACCENT_GOLD,
-        ).grid(row=0, column=0, pady=(14, 0))
+            text="MCHOSE",
+            font=("Helvetica", 14, "bold"),
+            text_color=TEXT_MUTED,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="w")
 
-        # firmware
-        self._fw_label = ctk.CTkLabel(
-            frame, text="", font=("Helvetica", 11), text_color=TEXT_DIM
-        )
-        self._fw_label.grid(row=1, column=0, pady=(0, 6))
-
-        # battery ring
-        self._ring = BatteryRing(frame, size=170)
-        self._ring.grid(row=2, column=0, pady=(4, 4))
-
-        # connection badge
-        self._conn_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        self._conn_frame.grid(row=3, column=0, pady=(2, 4))
-        self._conn_icon_cv = ctk.CTkLabel(
-            self._conn_frame, image=icon_headset(22, ACCENT_GREEN), text=""
-        )
-        self._conn_icon_cv.pack(side="left", padx=(0, 4))
-        self._conn_text = ctk.CTkLabel(
-            self._conn_frame,
-            text="Desconectado",
-            font=("Helvetica", 12, "bold"),
-            text_color=TEXT_DIM,
-        )
-        self._conn_text.pack(side="left")
-
-        # status pill
-        self._status_label = ctk.CTkLabel(
+        ctk.CTkLabel(
             frame,
-            text=" Fone não detectado",
-            image=icon_cross(16, ACCENT_RED),
-            compound="left",
+            text="V9 PRO CONTROLLER",
+            font=("Helvetica", 26, "bold"),
+            text_color=TEXT_PRIMARY,
+            anchor="w",
+        ).grid(row=2, column=0, sticky="w", pady=(0, 4))
+
+        # Firmware info
+        self._fw_label = ctk.CTkLabel(
+            frame,
+            text="",
+            font=("Helvetica", 11),
+            text_color=TEXT_MUTED,
+            anchor="w",
+        )
+        self._fw_label.grid(row=3, column=0, sticky="w", pady=(0, 0))
+
+    # ── battery section ────────────────────────────────────────────
+    def _build_battery_section(self):
+        card = self._make_card(row=1, pady_top=16)
+
+        # Battery ring (centered)
+        self._ring = BatteryRing(card, size=180)
+        self._ring.pack(pady=(20, 8))
+
+        # Status badge (below ring)
+        self._status_frame = ctk.CTkFrame(
+            card, fg_color=SURFACE_3, corner_radius=20, height=32
+        )
+        self._status_frame.pack(pady=(4, 16), padx=20)
+        self._status_frame.pack_propagate(False)
+
+        self._status_icon = ctk.CTkLabel(
+            self._status_frame, image=icon_cross(14, ACCENT_RED), text=""
+        )
+        self._status_icon.pack(side="left", padx=(12, 4))
+
+        self._status_label = ctk.CTkLabel(
+            self._status_frame,
+            text="Fone não detectado",
             font=("Helvetica", 11, "bold"),
             text_color=ACCENT_RED,
-            fg_color="#1e2227",
-            corner_radius=10,
-            padx=12,
-            pady=4,
         )
-        self._status_label.grid(row=4, column=0, pady=(4, 12))
+        self._status_label.pack(side="left", padx=(0, 12))
 
-    # ── volume card ────────────────────────────────────────────────────
+    # ── connection section ─────────────────────────────────────────
+    def _build_connection_section(self):
+        card = self._make_card(row=2, pady_top=8)
+
+        conn_row = ctk.CTkFrame(card, fg_color="transparent")
+        conn_row.pack(fill="x", padx=20, pady=(14, 14))
+
+        # Left side: icon + connection info
+        left = ctk.CTkFrame(conn_row, fg_color="transparent")
+        left.pack(side="left")
+
+        self._conn_icon_cv = ctk.CTkLabel(
+            left, image=icon_headset(20, TEXT_MUTED), text=""
+        )
+        self._conn_icon_cv.pack(side="left", padx=(0, 8))
+
+        info_frame = ctk.CTkFrame(left, fg_color="transparent")
+        info_frame.pack(side="left")
+
+        self._conn_text = ctk.CTkLabel(
+            info_frame,
+            text="Desconectado",
+            font=("Helvetica", 12, "bold"),
+            text_color=TEXT_MUTED,
+            anchor="w",
+        )
+        self._conn_text.pack(anchor="w")
+
+        self._conn_mode_label = ctk.CTkLabel(
+            info_frame,
+            text="Aguardando conexão...",
+            font=("Helvetica", 10),
+            text_color=TEXT_DIM,
+            anchor="w",
+        )
+        self._conn_mode_label.pack(anchor="w")
+
+        # Right side: connection indicator dot
+        self._conn_dot = tk.Canvas(
+            conn_row, width=10, height=10, bg=SURFACE_1, highlightthickness=0
+        )
+        self._conn_dot.pack(side="right")
+        self._draw_dot(TEXT_DIM)
+
+    def _draw_dot(self, color):
+        self._conn_dot.delete("all")
+        self._conn_dot.create_oval(1, 1, 9, 9, fill=color, outline="")
+
+    # ── volume card ────────────────────────────────────────────────
     def _build_volume_card(self):
-        card = self._make_card(row=1)
+        card = self._make_card(row=3, pady_top=8)
 
+        # Header row
         header = ctk.CTkFrame(card, fg_color="transparent")
-        header.pack(fill="x", padx=14, pady=(12, 0))
-        vol_icon = ctk.CTkLabel(header, image=icon_speaker(22, ACCENT_BLUE), text="")
-        vol_icon.pack(side="left", padx=(0, 6))
+        header.pack(fill="x", padx=20, pady=(16, 0))
+
+        left = ctk.CTkFrame(header, fg_color="transparent")
+        left.pack(side="left")
+
+        vol_icon = ctk.CTkLabel(left, image=icon_speaker(18, ACCENT_BLUE), text="")
+        vol_icon.pack(side="left", padx=(0, 8))
+
         ctk.CTkLabel(
-            header, text="Volume", font=("Helvetica", 13, "bold"), text_color=TEXT_WHITE
+            left,
+            text="Volume",
+            font=("Helvetica", 13, "bold"),
+            text_color=TEXT_PRIMARY,
         ).pack(side="left")
+
         self._vol_pct = ctk.CTkLabel(
-            header, text="50%", font=("Helvetica", 13), text_color=TEXT_SEC
+            header,
+            text="50%",
+            font=("Helvetica", 14, "bold"),
+            text_color=ACCENT_BLUE,
         )
         self._vol_pct.pack(side="right")
 
+        # Slider
         self._vol_slider = ctk.CTkSlider(
             card,
             from_=0,
@@ -643,15 +762,15 @@ class MchoseBatteryApp(ctk.CTk):
             number_of_steps=100,
             command=self._on_vol_slide,
             button_color=ACCENT_BLUE,
-            button_hover_color="#6ab4ff",
+            button_hover_color="#93c5fd",
             progress_color=ACCENT_BLUE,
-            button_length=18,
-            button_corner_radius=9,
-            height=18,
+            button_length=22,
+            button_corner_radius=11,
+            height=20,
+            corner_radius=10,
         )
         self._vol_slider.set(self.volume_level)
-        self._vol_slider.pack(fill="x", padx=14, pady=(8, 14))
-        # Reset drag flag on mouse release
+        self._vol_slider.pack(fill="x", padx=20, pady=(12, 16))
         self._vol_slider.bind(
             "<ButtonRelease-1>", lambda e: setattr(self, "_dragging_vol", False)
         )
@@ -666,58 +785,59 @@ class MchoseBatteryApp(ctk.CTk):
         self._vol_pct.configure(text=f"{v}%")
         threading.Thread(target=self._set_sys_vol, args=(v,), daemon=True).start()
 
-    # ── microphone card ────────────────────────────────────────────────
+    # ── microphone card ────────────────────────────────────────────
     def _build_mic_card(self):
-        card = self._make_card(row=2)
+        card = self._make_card(row=4, pady_top=6)
 
-        # row 1: icon + label + mute switch
-        top = ctk.CTkFrame(card, fg_color="transparent")
-        top.pack(fill="x", padx=14, pady=(12, 0))
+        # Header row
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 0))
 
-        left = ctk.CTkFrame(top, fg_color="transparent")
+        left = ctk.CTkFrame(header, fg_color="transparent")
         left.pack(side="left")
+
         self._mic_icon_cv = ctk.CTkLabel(
-            left, image=icon_mic(22, ACCENT_GREEN), text=""
+            left, image=icon_mic(18, ACCENT_GREEN), text=""
         )
-        self._mic_icon_cv.pack(side="left", padx=(0, 6))
-        self._mic_lbl = ctk.CTkLabel(
+        self._mic_icon_cv.pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
             left,
             text="Microfone",
             font=("Helvetica", 13, "bold"),
-            text_color=TEXT_WHITE,
-        )
-        self._mic_lbl.pack(side="left")
+            text_color=TEXT_PRIMARY,
+        ).pack(side="left")
 
+        # Mute switch
         self._mic_switch = ctk.CTkSwitch(
-            top,
+            header,
             text="Mudo",
             onvalue=1,
             offvalue=0,
             command=self._on_mic_switch,
             font=("Helvetica", 11),
             button_color=ACCENT_RED if self.mic_muted else ACCENT_GREEN,
-            button_hover_color="#fca5a5" if self.mic_muted else "#6ee8a0",
+            button_hover_color="#fca5a5" if self.mic_muted else "#6ee7b7",
             progress_color=ACCENT_RED,
-            text_color=TEXT_SEC,
+            text_color=TEXT_SECONDARY,
         )
         self._mic_switch.pack(side="right")
         if self.mic_muted:
             self._mic_switch.select()
 
-        # row 2: mic volume slider
+        # Mic volume label row
         mic_vol_frame = ctk.CTkFrame(card, fg_color="transparent")
-        mic_vol_frame.pack(fill="x", padx=14, pady=(8, 4))
-        ctk.CTkLabel(
-            mic_vol_frame,
-            text="Volume Microfone",
-            font=("Helvetica", 11),
-            text_color=TEXT_SEC,
-        ).pack(side="left")
+        mic_vol_frame.pack(fill="x", padx=20, pady=(10, 0))
+
         self._mic_pct = ctk.CTkLabel(
-            mic_vol_frame, text="50%", font=("Helvetica", 11), text_color=TEXT_SEC
+            mic_vol_frame,
+            text="50%",
+            font=("Helvetica", 12, "bold"),
+            text_color=ACCENT_GREEN,
         )
         self._mic_pct.pack(side="right")
 
+        # Slider
         self._mic_slider = ctk.CTkSlider(
             card,
             from_=0,
@@ -725,15 +845,15 @@ class MchoseBatteryApp(ctk.CTk):
             number_of_steps=100,
             command=self._on_mic_slide,
             button_color=ACCENT_GREEN,
-            button_hover_color="#6ee8a0",
+            button_hover_color="#6ee7b7",
             progress_color=ACCENT_GREEN,
-            button_length=18,
-            button_corner_radius=9,
-            height=18,
+            button_length=22,
+            button_corner_radius=11,
+            height=20,
+            corner_radius=10,
         )
         self._mic_slider.set(self.mic_level)
-        self._mic_slider.pack(fill="x", padx=14, pady=(0, 14))
-        # Reset drag flag on mouse release
+        self._mic_slider.pack(fill="x", padx=20, pady=(10, 16))
         self._mic_slider.bind(
             "<ButtonRelease-1>", lambda e: setattr(self, "_dragging_mic", False)
         )
@@ -742,12 +862,13 @@ class MchoseBatteryApp(ctk.CTk):
         self.mic_muted = bool(self._mic_switch.get())
         color = ACCENT_RED if self.mic_muted else ACCENT_GREEN
         self._mic_icon_cv.configure(
-            image=icon_mic_muted(22, color) if self.mic_muted else icon_mic(22, color)
+            image=icon_mic_muted(18, color) if self.mic_muted else icon_mic(18, color)
         )
         self._mic_switch.configure(
             button_color=color,
-            button_hover_color="#fca5a5" if self.mic_muted else "#6ee8a0",
+            button_hover_color="#fca5a5" if self.mic_muted else "#6ee7b7",
         )
+        self._mic_pct.configure(text_color=color)
         threading.Thread(
             target=self._set_sys_mic_mute, args=(self.mic_muted,), daemon=True
         ).start()
@@ -762,56 +883,65 @@ class MchoseBatteryApp(ctk.CTk):
         self._mic_pct.configure(text=f"{v}%")
         threading.Thread(target=self._set_sys_vol, args=(v, False), daemon=True).start()
 
-    # ── equalizer card ─────────────────────────────────────────────────
+    # ── equalizer card ─────────────────────────────────────────────
     def _build_eq_card(self):
-        card = self._make_card(row=3)
+        card = self._make_card(row=5, pady_top=8)
 
+        # Header
         top = ctk.CTkFrame(card, fg_color="transparent")
-        top.pack(fill="x", padx=14, pady=(12, 0))
-        eq_icon = ctk.CTkLabel(top, image=icon_equalizer(20, ACCENT_GOLD), text="")
-        eq_icon.pack(side="left", padx=(0, 6))
-        self._eq_title = ctk.CTkLabel(
-            top,
+        top.pack(fill="x", padx=20, pady=(16, 0))
+
+        left = ctk.CTkFrame(top, fg_color="transparent")
+        left.pack(side="left")
+
+        eq_icon = ctk.CTkLabel(left, image=icon_equalizer(18, ACCENT_GOLD), text="")
+        eq_icon.pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(
+            left,
             text="Equalizador",
             font=("Helvetica", 13, "bold"),
             text_color=ACCENT_GOLD,
-        )
-        self._eq_title.pack(side="left")
+        ).pack(side="left")
+
         self._eq_hint = ctk.CTkLabel(
-            top, text="", font=("Helvetica", 10), text_color=TEXT_DIM
+            top,
+            text="",
+            font=("Helvetica", 10),
+            text_color=TEXT_MUTED,
         )
         self._eq_hint.pack(side="right")
 
+        # EQ buttons
         eq_frame = ctk.CTkFrame(card, fg_color="transparent")
-        eq_frame.pack(fill="x", padx=14, pady=(8, 14))
+        eq_frame.pack(fill="x", padx=20, pady=(12, 16))
         eq_frame.columnconfigure((0, 1, 2), weight=1)
 
         labels = ["Jogo 1", "Jogo 2", "Música"]
+        icons_fn = [icon_gamepad, icon_target, icon_music]
         self._eq_btns = []
+        self._eq_icon_imgs = []
+
         for i, txt in enumerate(labels):
             btn = ctk.CTkButton(
                 eq_frame,
                 text=txt,
-                corner_radius=10,
+                corner_radius=12,
                 font=("Helvetica", 12, "bold"),
-                height=36,
-                fg_color="#1a1d26",
-                hover_color="#252832",
+                height=40,
+                fg_color=SURFACE_2,
+                hover_color=SURFACE_3,
                 border_width=1,
-                border_color=CARD_BORDER,
-                text_color=TEXT_SEC,
+                border_color=BORDER,
+                text_color=TEXT_SECONDARY,
                 command=lambda m=i: self._change_eq(m),
             )
             btn.grid(row=0, column=i, sticky="ew", padx=4)
             self._eq_btns.append(btn)
-        # EQ icon images
-        self._eq_icon_imgs = [
-            icon_gamepad(16, TEXT_SEC),
-            icon_target(16, TEXT_SEC),
-            icon_music(16, TEXT_SEC),
-        ]
-        for i in range(3):
-            self._eq_btns[i].configure(image=self._eq_icon_imgs[i], compound="left")
+            img = icons_fn[i](14, TEXT_SECONDARY)
+            self._eq_icon_imgs.append(img)
+            btn.configure(image=img, compound="left")
+
         self._update_eq_buttons()
 
     def _change_eq(self, mode):
@@ -827,125 +957,142 @@ class MchoseBatteryApp(ctk.CTk):
         for i, btn in enumerate(self._eq_btns):
             if i == self.eq_mode and enabled:
                 btn.configure(
-                    fg_color=ACCENT_BLUE,
-                    hover_color="#6ab4ff",
-                    text_color="#ffffff",
-                    border_color=ACCENT_BLUE,
+                    fg_color=ACCENT_GOLD,
+                    hover_color="#fcd34d",
+                    text_color="#000000",
+                    border_color=ACCENT_GOLD,
                 )
-                ic_color = "#ffffff"
+                ic_color = "#000000"
             elif enabled:
                 btn.configure(
-                    fg_color="#1a1d26",
-                    hover_color="#252832",
-                    text_color=TEXT_SEC,
-                    border_color=CARD_BORDER,
+                    fg_color=SURFACE_2,
+                    hover_color=SURFACE_3,
+                    text_color=TEXT_SECONDARY,
+                    border_color=BORDER,
                 )
-                ic_color = TEXT_SEC
+                ic_color = TEXT_SECONDARY
             else:
                 btn.configure(
-                    fg_color="#15171e",
-                    hover_color="#15171e",
-                    text_color="#3a3d48",
-                    border_color="#1e2028",
+                    fg_color=BG,
+                    hover_color=BG,
+                    text_color=TEXT_DIM,
+                    border_color="#151a24",
                 )
-                ic_color = "#3a3d48"
-            if hasattr(self, "_eq_icon_imgs") and i < len(self._eq_icon_imgs):
-                self._eq_icon_imgs[i] = eq_fns[i](16, ic_color)
-                btn.configure(image=self._eq_icon_imgs[i])
+                ic_color = TEXT_DIM
+            self._eq_icon_imgs[i] = eq_fns[i](14, ic_color)
+            btn.configure(image=self._eq_icon_imgs[i])
+
         if not enabled:
             self._eq_hint.configure(text="somente 2.4G")
         else:
             self._eq_hint.configure(text="")
 
-    # ── footer ─────────────────────────────────────────────────────────
-    def _build_footer(self):
-        self._footer = ctk.CTkLabel(
-            self._main,
-            text="MCHOSE V9 PRO Controller",
-            font=("Helvetica", 10),
-            text_color="#3a3d48",
-        )
-        self._footer.grid(row=4, column=0, pady=(4, 16))
-
-    # ── card helper ────────────────────────────────────────────────────
-    def _make_card(self, row):
+    # ── card helper ────────────────────────────────────────────────
+    def _make_card(self, row, pady_top=8):
         f = ctk.CTkFrame(
             self._main,
-            fg_color=CARD_BG,
-            corner_radius=14,
+            fg_color=SURFACE_1,
+            corner_radius=16,
             border_width=1,
-            border_color=CARD_BORDER,
+            border_color=BORDER,
         )
-        f.grid(row=row, column=0, sticky="ew", padx=16, pady=6)
+        f.grid(row=row, column=0, sticky="ew", padx=20, pady=(pady_top, 0))
         return f
 
     # ═══════════════════════════════════════════════════════════════════
     # UI refresh (called from poll thread)
     # ═══════════════════════════════════════════════════════════════════
     def _refresh_ui(self):
-        # battery color
         bat = self.battery_level
         bcolor = _battery_color(bat)
-
         self._ring.set_value(bat if self.connected else 0, bcolor)
 
-        # connection status
         if self.connected:
             mode = self.connection_mode or ""
-            icon_color = ACCENT_BLUE if mode == "Bluetooth" else ACCENT_GREEN
-            if mode == "Bluetooth":
-                self._conn_icon_cv.configure(image=icon_bluetooth(22, icon_color))
-            else:
-                self._conn_icon_cv.configure(image=icon_wifi(22, icon_color))
-            self._conn_text.configure(text=mode, text_color=TEXT_WHITE)
+            icon_color = ACCENT_INDIGO if mode == "Bluetooth" else ACCENT_GREEN
+            dot_color = ACCENT_INDIGO if mode == "Bluetooth" else ACCENT_GREEN
 
+            if mode == "Bluetooth":
+                self._conn_icon_cv.configure(image=icon_bluetooth(20, icon_color))
+            else:
+                self._conn_icon_cv.configure(image=icon_wifi(20, icon_color))
+
+            self._conn_text.configure(text="Conectado", text_color=TEXT_PRIMARY)
+            self._conn_mode_label.configure(text=mode, text_color=icon_color)
+            self._draw_dot(dot_color)
+
+            # Status badge
             status_map = {
-                0x02: ("Em uso", icon_battery_status(16, ACCENT_GREEN), ACCENT_GREEN),
-                0x03: ("Carregando...", icon_lightning(16, "#f59e0b"), "#f59e0b"),
-                0x04: ("Carregado (100%)", icon_check(16, ACCENT_GREEN), ACCENT_GREEN),
-                0x1A: ("Modo de Suspensão", icon_moon(16, TEXT_DIM), TEXT_DIM),
+                0x02: (
+                    "Em uso",
+                    icon_battery_status(14, ACCENT_GREEN),
+                    ACCENT_GREEN,
+                    GLOW_GREEN,
+                ),
+                0x03: (
+                    "Carregando...",
+                    icon_lightning(14, ACCENT_ORANGE),
+                    ACCENT_ORANGE,
+                    GLOW_GOLD,
+                ),
+                0x04: (
+                    "Carregado (100%)",
+                    icon_check(14, ACCENT_GREEN),
+                    ACCENT_GREEN,
+                    GLOW_GREEN,
+                ),
+                0x1A: (
+                    "Modo de Suspensão",
+                    icon_moon(14, TEXT_SECONDARY),
+                    TEXT_SECONDARY,
+                    SURFACE_3,
+                ),
             }
+
             if mode == "2.4G":
                 mapped = status_map.get(self.status_code)
                 if mapped:
-                    txt, img, txt_color = mapped
+                    txt, img, txt_color, bg = mapped
                 else:
-                    txt, img, txt_color = (
+                    txt, img, txt_color, bg = (
                         f"Status: {hex(self.status_code)}",
-                        icon_battery_status(16, ACCENT_GREEN),
+                        icon_battery_status(14, ACCENT_GREEN),
                         ACCENT_GREEN,
+                        GLOW_GREEN,
                     )
             else:
-                txt, img, txt_color = (
-                    "Bluetooth conectado",
-                    icon_bluetooth(16, ACCENT_BLUE),
-                    ACCENT_BLUE,
-                )
+                txt = "Bluetooth conectado"
+                img = icon_bluetooth(14, ACCENT_INDIGO)
+                txt_color = ACCENT_INDIGO
+                bg = GLOW_BLUE
 
-            # Badge style with native Pillow status icon (compound="left")
-            self._status_label.configure(
-                text=f" {txt}", image=img, text_color=txt_color, fg_color="#1e2227"
-            )
+            self._status_label.configure(text=txt, text_color=txt_color)
+            self._status_icon.configure(image=img)
+            self._status_frame.configure(fg_color=bg)
+
         else:
-            self._conn_icon_cv.configure(image=icon_wifi(22, "#3a3d48"))
-            self._conn_text.configure(text="Desconectado", text_color=TEXT_DIM)
-            self._status_label.configure(
-                text=" Fone não detectado",
-                image=icon_cross(16, ACCENT_RED),
-                text_color=ACCENT_RED,
-                fg_color="#1e2227",
+            self._conn_icon_cv.configure(image=icon_headset(20, TEXT_DIM))
+            self._conn_text.configure(text="Desconectado", text_color=TEXT_MUTED)
+            self._conn_mode_label.configure(
+                text="Aguardando conexão...", text_color=TEXT_DIM
             )
+            self._draw_dot(TEXT_DIM)
+            self._status_label.configure(
+                text="Fone não detectado", text_color=ACCENT_RED
+            )
+            self._status_icon.configure(image=icon_cross(14, ACCENT_RED))
+            self._status_frame.configure(fg_color=GLOW_RED)
             self.fw_dongle = ""
             self.fw_headset = ""
 
         # firmware
         if self.connected:
-            fw = f"FW: {self.fw_dongle or '--'} / HS: {self.fw_headset or '--'}"
+            fw = f"FW Dongle: {self.fw_dongle or '—'}  •  FW Headset: {self.fw_headset or '—'}"
         else:
             fw = ""
         self._fw_label.configure(text=fw)
 
-        # volume slider (skip if user is dragging)
+        # volume slider
         if not self._vol_slider.get() == self.volume_level:
             self._vol_slider.set(self.volume_level)
         self._vol_pct.configure(text=f"{self.volume_level}%")
@@ -956,17 +1103,19 @@ class MchoseBatteryApp(ctk.CTk):
         if self.mic_muted:
             if not self._mic_switch.get():
                 self._mic_switch.select()
-            self._mic_icon_cv.configure(image=icon_mic_muted(22, ACCENT_RED))
+            self._mic_icon_cv.configure(image=icon_mic_muted(18, ACCENT_RED))
             self._mic_switch.configure(
                 button_color=ACCENT_RED, button_hover_color="#fca5a5"
             )
+            self._mic_pct.configure(text_color=ACCENT_RED)
         else:
             if self._mic_switch.get():
                 self._mic_switch.deselect()
-            self._mic_icon_cv.configure(image=icon_mic(22, ACCENT_GREEN))
+            self._mic_icon_cv.configure(image=icon_mic(18, ACCENT_GREEN))
             self._mic_switch.configure(
-                button_color=ACCENT_GREEN, button_hover_color="#6ee8a0"
+                button_color=ACCENT_GREEN, button_hover_color="#6ee7b7"
             )
+            self._mic_pct.configure(text_color=ACCENT_GREEN)
 
         self._update_eq_buttons()
 
@@ -1038,7 +1187,6 @@ class MchoseBatteryApp(ctk.CTk):
         battery = status_code = eq_mode = 0
         ok_bat = ok_eq = False
         try:
-            # battery query
             buf = bytearray(64)
             buf[0], buf[1], buf[2] = 0x55, 0x65, 0x01
             c_buf = (ctypes.c_char * 64).from_buffer(buf)
@@ -1050,7 +1198,6 @@ class MchoseBatteryApp(ctk.CTk):
                     if d[0] == 0x55 and d[1] == 0x65:
                         battery, status_code = d[2], d[3]
                         ok_bat = True
-            # eq query
             buf2 = bytearray(64)
             buf2[0], buf2[1] = 0x55, 0x11
             c2 = (ctypes.c_char * 64).from_buffer(buf2)
@@ -1245,7 +1392,6 @@ class MchoseBatteryApp(ctk.CTk):
     def _poll_loop(self):
         fw_counter = 0
         while not self._stop:
-            # 1. try 2.4G HID
             ok, bat, sc, eq = self._query_hid()
             if ok:
                 was_off = not self.connected
@@ -1263,7 +1409,6 @@ class MchoseBatteryApp(ctk.CTk):
                     if fh:
                         self.fw_headset = fh
             else:
-                # 2. try bluetooth
                 ok_bt, bat_bt = self._query_bluetooth()
                 if ok_bt:
                     self.connected = True
@@ -1274,10 +1419,7 @@ class MchoseBatteryApp(ctk.CTk):
                     self.connected = False
                     self.connection_mode = None
 
-            # refresh system audio state
             self._refresh_system_audio()
-
-            # update UI on main thread
             self.after(0, self._refresh_ui)
 
             for _ in range(20):
