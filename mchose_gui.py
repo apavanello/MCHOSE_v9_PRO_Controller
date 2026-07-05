@@ -36,8 +36,14 @@ def _make(draw_fn, size=24, color="#e2e4e9"):
 
 
 def icon(draw_fn):
+    cache = {}
+
     def wrapper(size=24, color="#e2e4e9"):
-        return _make(draw_fn, size, color)
+        key = (draw_fn.__name__, size, color)
+        if key not in cache:
+            cache[key] = _make(draw_fn, size, color)
+        return cache[key]
+
     return wrapper
 
 
@@ -1063,6 +1069,10 @@ class MchoseBatteryApp(ctk.CTk):
         else:
             self._eq_hint.configure(text="")
 
+    # thread-safe UI helper
+    def _ui(self, fn, *args, **kwargs):
+        self.after(0, lambda: fn(*args, **kwargs))
+
     # card helper
     def _make_card(self, row, pady_top=8):
         f = ctk.CTkFrame(
@@ -1458,7 +1468,7 @@ class MchoseBatteryApp(ctk.CTk):
         def run():
             while not self._stop:
                 self._refresh_system_audio()
-                self.after(0, self._refresh_ui_audio_only)
+                self._ui(self._refresh_ui_audio_only)
                 time.sleep(0.3)
         threading.Thread(target=run, daemon=True).start()
 
@@ -1508,7 +1518,7 @@ class MchoseBatteryApp(ctk.CTk):
                     self.connection_mode = None
 
             self._refresh_system_audio()
-            self.after(0, self._refresh_ui)
+            self._ui(self._refresh_ui)
 
             for _ in range(20):
                 if self._stop:
