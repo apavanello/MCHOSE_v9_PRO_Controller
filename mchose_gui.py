@@ -31,311 +31,285 @@ def _make(draw_fn, size=24, color="#e2e4e9"):
     return ctk.CTkImage(light_image=img, dark_image=img, size=(size, size))
 
 
+def icon(draw_fn):
+    def wrapper(size=24, color="#e2e4e9"):
+        return _make(draw_fn, size, color)
+    return wrapper
+
+
 # Speaker / Volume
-def icon_speaker(size=24, color="#60a5fa"):
-    def draw(d, s, c):
-        d.polygon(
-            [
-                (s * 0.16, s * 0.38),
-                (s * 0.16, s * 0.62),
-                (s * 0.34, s * 0.62),
-                (s * 0.48, s * 0.74),
-                (s * 0.48, s * 0.26),
-                (s * 0.34, s * 0.38),
-            ],
+@icon
+def icon_speaker(d, s, c):
+    d.polygon(
+        [
+            (s * 0.16, s * 0.38),
+            (s * 0.16, s * 0.62),
+            (s * 0.34, s * 0.62),
+            (s * 0.48, s * 0.74),
+            (s * 0.48, s * 0.26),
+            (s * 0.34, s * 0.38),
+        ],
+        fill=c,
+    )
+    w = max(2, int(s * 0.05))
+    cx, cy = s * 0.38, s * 0.50
+    for f in [0.22, 0.35, 0.48]:
+        d.arc(
+            [cx - s * f, cy - s * f, cx + s * f, cy + s * f],
+            -45,
+            45,
             fill=c,
+            width=w,
         )
-        w = max(2, int(s * 0.05))
-        cx, cy = s * 0.38, s * 0.50
-        for f in [0.22, 0.35, 0.48]:
-            d.arc(
-                [cx - s * f, cy - s * f, cx + s * f, cy + s * f],
-                -45,
-                45,
-                fill=c,
-                width=w,
-            )
-
-    return _make(draw, size, color)
 
 
-def icon_speaker_muted(size=24, color="#f87171"):
-    def draw(d, s, c):
-        d.polygon(
-            [
-                (s * 0.16, s * 0.38),
-                (s * 0.16, s * 0.62),
-                (s * 0.34, s * 0.62),
-                (s * 0.48, s * 0.74),
-                (s * 0.48, s * 0.26),
-                (s * 0.34, s * 0.38),
-            ],
-            fill=c,
-        )
-        w = max(2, int(s * 0.06))
-        d.line([(s * 0.62, s * 0.42), (s * 0.74, s * 0.58)], fill=c, width=w)
-        d.line([(s * 0.62, s * 0.58), (s * 0.74, s * 0.42)], fill=c, width=w)
-
-    return _make(draw, size, color)
+@icon
+def icon_speaker_muted(d, s, c):
+    d.polygon(
+        [
+            (s * 0.16, s * 0.38),
+            (s * 0.16, s * 0.62),
+            (s * 0.34, s * 0.62),
+            (s * 0.48, s * 0.74),
+            (s * 0.48, s * 0.26),
+            (s * 0.34, s * 0.38),
+        ],
+        fill=c,
+    )
+    w = max(2, int(s * 0.06))
+    d.line([(s * 0.62, s * 0.42), (s * 0.74, s * 0.58)], fill=c, width=w)
+    d.line([(s * 0.62, s * 0.58), (s * 0.74, s * 0.42)], fill=c, width=w)
 
 
 # Microphone
-def icon_mic(size=24, color="#34d399"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.05))
-        cx, cap_r = s * 0.50, s * 0.16
-        d.rounded_rectangle(
-            [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
-        )
-        arc_r = s * 0.26
-        d.arc(
-            [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
-            0,
-            180,
-            fill=c,
-            width=max(2, int(s * 0.05)),
-        )
-        d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
-        d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
-
-    return _make(draw, size, color)
+@icon
+def icon_mic(d, s, c):
+    w = max(2, int(s * 0.05))
+    cx, cap_r = s * 0.50, s * 0.16
+    d.rounded_rectangle(
+        [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
+    )
+    arc_r = s * 0.26
+    d.arc(
+        [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
+        0,
+        180,
+        fill=c,
+        width=max(2, int(s * 0.05)),
+    )
+    d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
+    d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
 
 
-def icon_mic_muted(size=24, color="#f87171"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.05))
-        cx, cap_r = s * 0.50, s * 0.16
-        d.rounded_rectangle(
-            [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
-        )
-        arc_r = s * 0.26
-        d.arc(
-            [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
-            0,
-            180,
-            fill=c,
-            width=max(2, int(s * 0.05)),
-        )
-        d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
-        d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
-        d.line(
-            [(s * 0.12, s * 0.88), (s * 0.88, s * 0.12)],
-            fill=c,
-            width=max(3, int(s * 0.07)),
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_mic_muted(d, s, c):
+    w = max(2, int(s * 0.05))
+    cx, cap_r = s * 0.50, s * 0.16
+    d.rounded_rectangle(
+        [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
+    )
+    arc_r = s * 0.26
+    d.arc(
+        [cx - arc_r, s * 0.34, cx + arc_r, s * 0.74],
+        0,
+        180,
+        fill=c,
+        width=max(2, int(s * 0.05)),
+    )
+    d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
+    d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
+    d.line(
+        [(s * 0.12, s * 0.88), (s * 0.88, s * 0.12)],
+        fill=c,
+        width=max(3, int(s * 0.07)),
+    )
 
 
 # Equalizer
-def icon_equalizer(size=24, color="#fbbf24"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.05))
-        for x in [0.28, 0.50, 0.72]:
-            d.line([(s * x, s * 0.20), (s * x, s * 0.80)], fill=c, width=w)
-        r = s * 0.08
-        for x, y in [(0.28, 0.60), (0.50, 0.35), (0.72, 0.50)]:
-            d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
-
-    return _make(draw, size, color)
+@icon
+def icon_equalizer(d, s, c):
+    w = max(2, int(s * 0.05))
+    for x in [0.28, 0.50, 0.72]:
+        d.line([(s * x, s * 0.20), (s * x, s * 0.80)], fill=c, width=w)
+    r = s * 0.08
+    for x, y in [(0.28, 0.60), (0.50, 0.35), (0.72, 0.50)]:
+        d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
 
 
 # WiFi / Wireless Signal
-def icon_wifi(size=24, color="#34d399"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.05))
-        cx, cy = s * 0.50, s * 0.72
-        r = s * 0.06
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-        for rf in [0.20, 0.40, 0.60]:
-            rad = s * rf
-            d.arc([cx - rad, cy - rad, cx + rad, cy + rad], 220, 320, fill=c, width=w)
-
-    return _make(draw, size, color)
+@icon
+def icon_wifi(d, s, c):
+    w = max(2, int(s * 0.05))
+    cx, cy = s * 0.50, s * 0.72
+    r = s * 0.06
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
+    for rf in [0.20, 0.40, 0.60]:
+        rad = s * rf
+        d.arc([cx - rad, cy - rad, cx + rad, cy + rad], 220, 320, fill=c, width=w)
 
 
 # Bluetooth
-def icon_bluetooth(size=24, color="#818cf8"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.08))
-        d.line(
-            [
-                (s * 0.32, s * 0.30),
-                (s * 0.68, s * 0.66),
-                (s * 0.50, s * 0.84),
-                (s * 0.50, s * 0.16),
-                (s * 0.68, s * 0.34),
-                (s * 0.32, s * 0.70),
-            ],
-            fill=c,
-            width=w,
-            joint="round",
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_bluetooth(d, s, c):
+    w = max(2, int(s * 0.08))
+    d.line(
+        [
+            (s * 0.32, s * 0.30),
+            (s * 0.68, s * 0.66),
+            (s * 0.50, s * 0.84),
+            (s * 0.50, s * 0.16),
+            (s * 0.68, s * 0.34),
+            (s * 0.32, s * 0.70),
+        ],
+        fill=c,
+        width=w,
+        joint="round",
+    )
 
 
 # Gamepad
-def icon_gamepad(size=24, color="#e2e4e9"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.06))
-        d.rounded_rectangle(
-            [s * 0.12, s * 0.28, s * 0.88, s * 0.72],
-            radius=int(s * 0.16),
-            outline=c,
-            width=w,
-        )
-        d.line([(s * 0.28, s * 0.40), (s * 0.28, s * 0.60)], fill=c, width=w)
-        d.line([(s * 0.18, s * 0.50), (s * 0.38, s * 0.50)], fill=c, width=w)
-        r = s * 0.045
-        for x, y in [(0.68, 0.42), (0.78, 0.50), (0.68, 0.58), (0.58, 0.50)]:
-            d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
-
-    return _make(draw, size, color)
+@icon
+def icon_gamepad(d, s, c):
+    w = max(2, int(s * 0.06))
+    d.rounded_rectangle(
+        [s * 0.12, s * 0.28, s * 0.88, s * 0.72],
+        radius=int(s * 0.16),
+        outline=c,
+        width=w,
+    )
+    d.line([(s * 0.28, s * 0.40), (s * 0.28, s * 0.60)], fill=c, width=w)
+    d.line([(s * 0.18, s * 0.50), (s * 0.38, s * 0.50)], fill=c, width=w)
+    r = s * 0.045
+    for x, y in [(0.68, 0.42), (0.78, 0.50), (0.68, 0.58), (0.58, 0.50)]:
+        d.ellipse([s * x - r, s * y - r, s * x + r, s * y + r], fill=c)
 
 
 # Target / Crosshair
-def icon_target(size=24, color="#e2e4e9"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.06))
-        cx = cy = s * 0.50
-        r = s * 0.32
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=c, width=w)
-        cr = s * 0.05
-        d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=c)
-        d.line([(cx, cy - r - s * 0.10), (cx, cy - r + s * 0.06)], fill=c, width=w)
-        d.line([(cx, cy + r - s * 0.06), (cx, cy + r + s * 0.10)], fill=c, width=w)
-        d.line([(cx - r - s * 0.10, cy), (cx - r + s * 0.06, cy)], fill=c, width=w)
-        d.line([(cx + r - s * 0.06, cy), (cx + r + s * 0.10, cy)], fill=c, width=w)
-
-    return _make(draw, size, color)
+@icon
+def icon_target(d, s, c):
+    w = max(2, int(s * 0.06))
+    cx = cy = s * 0.50
+    r = s * 0.32
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=c, width=w)
+    cr = s * 0.05
+    d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=c)
+    d.line([(cx, cy - r - s * 0.10), (cx, cy - r + s * 0.06)], fill=c, width=w)
+    d.line([(cx, cy + r - s * 0.06), (cx, cy + r + s * 0.10)], fill=c, width=w)
+    d.line([(cx - r - s * 0.10, cy), (cx - r + s * 0.06, cy)], fill=c, width=w)
+    d.line([(cx + r - s * 0.06, cy), (cx + r + s * 0.10, cy)], fill=c, width=w)
 
 
 # Music note
-def icon_music(size=24, color="#e2e4e9"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.06))
-        d.ellipse([s * 0.18, s * 0.60, s * 0.38, s * 0.76], fill=c)
-        d.ellipse([s * 0.52, s * 0.50, s * 0.72, s * 0.66], fill=c)
-        d.line([(s * 0.38, s * 0.68), (s * 0.38, s * 0.22)], fill=c, width=w)
-        d.line([(s * 0.72, s * 0.58), (s * 0.72, s * 0.12)], fill=c, width=w)
-        beam_w = max(3, int(s * 0.12))
-        d.line([(s * 0.38, s * 0.22), (s * 0.72, s * 0.12)], fill=c, width=beam_w)
-
-    return _make(draw, size, color)
+@icon
+def icon_music(d, s, c):
+    w = max(2, int(s * 0.06))
+    d.ellipse([s * 0.18, s * 0.60, s * 0.38, s * 0.76], fill=c)
+    d.ellipse([s * 0.52, s * 0.50, s * 0.72, s * 0.66], fill=c)
+    d.line([(s * 0.38, s * 0.68), (s * 0.38, s * 0.22)], fill=c, width=w)
+    d.line([(s * 0.72, s * 0.58), (s * 0.72, s * 0.12)], fill=c, width=w)
+    beam_w = max(3, int(s * 0.12))
+    d.line([(s * 0.38, s * 0.22), (s * 0.72, s * 0.12)], fill=c, width=beam_w)
 
 
 # Headset / Connected
-def icon_headset(size=24, color="#e2e4e9"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.06))
-        cx, cy = s * 0.50, s * 0.50
-        hb_r = s * 0.30
-        d.arc([cx - hb_r, cy - hb_r, cx + hb_r, cy + hb_r], 180, 360, fill=c, width=w)
-        cup_w = s * 0.12
-        cup_y1 = cy - s * 0.05
-        cup_y2 = cy + s * 0.23
-        d.rounded_rectangle(
-            [cx - hb_r - cup_w / 2, cup_y1, cx - hb_r + cup_w / 2, cup_y2],
-            radius=int(cup_w / 2),
-            fill=c,
-        )
-        d.rounded_rectangle(
-            [cx + hb_r - cup_w / 2, cup_y1, cx + hb_r + cup_w / 2, cup_y2],
-            radius=int(cup_w / 2),
-            fill=c,
-        )
-        d.line(
-            [cx - hb_r, cy + s * 0.12, cx - s * 0.12, cy + s * 0.32],
-            fill=c,
-            width=max(2, int(w * 0.7)),
-        )
-        r = s * 0.05
-        d.ellipse(
-            [
-                cx - s * 0.12 - r,
-                cy + s * 0.32 - r,
-                cx - s * 0.12 + r,
-                cy + s * 0.32 + r,
-            ],
-            fill=c,
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_headset(d, s, c):
+    w = max(2, int(s * 0.06))
+    cx, cy = s * 0.50, s * 0.50
+    hb_r = s * 0.30
+    d.arc([cx - hb_r, cy - hb_r, cx + hb_r, cy + hb_r], 180, 360, fill=c, width=w)
+    cup_w = s * 0.12
+    cup_y1 = cy - s * 0.05
+    cup_y2 = cy + s * 0.23
+    d.rounded_rectangle(
+        [cx - hb_r - cup_w / 2, cup_y1, cx - hb_r + cup_w / 2, cup_y2],
+        radius=int(cup_w / 2),
+        fill=c,
+    )
+    d.rounded_rectangle(
+        [cx + hb_r - cup_w / 2, cup_y1, cx + hb_r + cup_w / 2, cup_y2],
+        radius=int(cup_w / 2),
+        fill=c,
+    )
+    d.line(
+        [cx - hb_r, cy + s * 0.12, cx - s * 0.12, cy + s * 0.32],
+        fill=c,
+        width=max(2, int(w * 0.7)),
+    )
+    r = s * 0.05
+    d.ellipse(
+        [
+            cx - s * 0.12 - r,
+            cy + s * 0.32 - r,
+            cx - s * 0.12 + r,
+            cy + s * 0.32 + r,
+        ],
+        fill=c,
+    )
 
 
 # Battery Status Icon
-def icon_battery_status(size=16, color="#34d399"):
-    def draw(d, s, c):
-        w = max(1.5, s * 0.08)
-        d.rounded_rectangle(
-            [s * 0.12, s * 0.28, s * 0.76, s * 0.72],
-            radius=int(s * 0.08),
-            outline=c,
-            width=int(w),
-        )
-        d.rounded_rectangle(
-            [s * 0.76, s * 0.42, s * 0.88, s * 0.58], radius=int(s * 0.04), fill=c
-        )
-        d.rounded_rectangle(
-            [s * 0.22, s * 0.36, s * 0.42, s * 0.64], radius=int(s * 0.02), fill=c
-        )
-        d.rounded_rectangle(
-            [s * 0.48, s * 0.36, s * 0.68, s * 0.64], radius=int(s * 0.02), fill=c
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_battery_status(d, s, c):
+    w = max(1.5, s * 0.08)
+    d.rounded_rectangle(
+        [s * 0.12, s * 0.28, s * 0.76, s * 0.72],
+        radius=int(s * 0.08),
+        outline=c,
+        width=int(w),
+    )
+    d.rounded_rectangle(
+        [s * 0.76, s * 0.42, s * 0.88, s * 0.58], radius=int(s * 0.04), fill=c
+    )
+    d.rounded_rectangle(
+        [s * 0.22, s * 0.36, s * 0.42, s * 0.64], radius=int(s * 0.02), fill=c
+    )
+    d.rounded_rectangle(
+        [s * 0.48, s * 0.36, s * 0.68, s * 0.64], radius=int(s * 0.02), fill=c
+    )
 
 
 # Lightning Bolt
-def icon_lightning(size=16, color="#fbbf24"):
-    def draw(d, s, c):
-        d.polygon(
-            [
-                (s * 0.55, s * 0.12),
-                (s * 0.24, s * 0.52),
-                (s * 0.48, s * 0.52),
-                (s * 0.45, s * 0.88),
-                (s * 0.76, s * 0.48),
-                (s * 0.52, s * 0.48),
-            ],
-            fill=c,
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_lightning(d, s, c):
+    d.polygon(
+        [
+            (s * 0.55, s * 0.12),
+            (s * 0.24, s * 0.52),
+            (s * 0.48, s * 0.52),
+            (s * 0.45, s * 0.88),
+            (s * 0.76, s * 0.48),
+            (s * 0.52, s * 0.48),
+        ],
+        fill=c,
+    )
 
 
 # Checkmark
-def icon_check(size=16, color="#34d399"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.10))
-        d.line(
-            [(s * 0.24, s * 0.50), (s * 0.42, s * 0.68), (s * 0.76, s * 0.28)],
-            fill=c,
-            width=w,
-            joint="round",
-        )
-
-    return _make(draw, size, color)
+@icon
+def icon_check(d, s, c):
+    w = max(2, int(s * 0.10))
+    d.line(
+        [(s * 0.24, s * 0.50), (s * 0.42, s * 0.68), (s * 0.76, s * 0.28)],
+        fill=c,
+        width=w,
+        joint="round",
+    )
 
 
 # Crescent Moon
-def icon_moon(size=16, color="#64748b"):
-    def draw(d, s, c):
-        d.ellipse([s * 0.24, s * 0.24, s * 0.76, s * 0.76], fill=c)
-        d.ellipse([s * 0.38, s * 0.20, s * 0.82, s * 0.72], fill="#0f1318")
-
-    return _make(draw, size, color)
+@icon
+def icon_moon(d, s, c):
+    d.ellipse([s * 0.24, s * 0.24, s * 0.76, s * 0.76], fill=c)
+    d.ellipse([s * 0.38, s * 0.20, s * 0.82, s * 0.72], fill="#0f1318")
 
 
 # Alert Cross
-def icon_cross(size=16, color="#f87171"):
-    def draw(d, s, c):
-        w = max(2, int(s * 0.08))
-        d.line([(s * 0.28, s * 0.28), (s * 0.72, s * 0.72)], fill=c, width=w)
-        d.line([(s * 0.28, s * 0.72), (s * 0.72, s * 0.28)], fill=c, width=w)
-
-    return _make(draw, size, color)
+@icon
+def icon_cross(d, s, c):
+    w = max(2, int(s * 0.08))
+    d.line([(s * 0.28, s * 0.28), (s * 0.72, s * 0.72)], fill=c, width=w)
+    d.line([(s * 0.28, s * 0.72), (s * 0.72, s * 0.28)], fill=c, width=w)
 
 
 # Color Palette 
@@ -1012,12 +986,15 @@ class MchoseBatteryApp(ctk.CTk):
         eq_frame.pack(fill="x", padx=20, pady=(12, 16))
         eq_frame.columnconfigure((0, 1, 2), weight=1)
 
-        labels = ["Jogo 1", "Jogo 2", "Música"]
-        icons_fn = [icon_gamepad, icon_target, icon_music]
+        self._eq_data = [
+            ("Jogo 1", icon_gamepad),
+            ("Jogo 2", icon_target),
+            ("Música", icon_music),
+        ]
         self._eq_btns = []
         self._eq_icon_imgs = []
 
-        for i, txt in enumerate(labels):
+        for i, (txt, icon_fn) in enumerate(self._eq_data):
             btn = ctk.CTkButton(
                 eq_frame,
                 text=txt,
@@ -1033,7 +1010,7 @@ class MchoseBatteryApp(ctk.CTk):
             )
             btn.grid(row=0, column=i, sticky="ew", padx=4)
             self._eq_btns.append(btn)
-            img = icons_fn[i](14, TEXT_SECONDARY)
+            img = icon_fn(14, TEXT_SECONDARY)
             self._eq_icon_imgs.append(img)
             btn.configure(image=img, compound="left")
 
@@ -1048,7 +1025,6 @@ class MchoseBatteryApp(ctk.CTk):
 
     def _update_eq_buttons(self):
         enabled = self.connected and self.connection_mode == "2.4G"
-        eq_fns = [icon_gamepad, icon_target, icon_music]
         for i, btn in enumerate(self._eq_btns):
             if i == self.eq_mode and enabled:
                 btn.configure(
@@ -1074,7 +1050,8 @@ class MchoseBatteryApp(ctk.CTk):
                     border_color="#151a24",
                 )
                 ic_color = TEXT_DIM
-            self._eq_icon_imgs[i] = eq_fns[i](14, ic_color)
+            icon_fn = self._eq_data[i][1]
+            self._eq_icon_imgs[i] = icon_fn(14, ic_color)
             btn.configure(image=self._eq_icon_imgs[i])
 
         if not enabled:
