@@ -22,6 +22,10 @@ except ImportError:
 _SCALE = 4
 
 
+def _stroke(s, factor=0.05, min_px=2):
+    return max(min_px, int(s * factor))
+
+
 def _make(draw_fn, size=24, color="#e2e4e9"):
     px = size * _SCALE
     img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
@@ -51,7 +55,7 @@ def icon_speaker(d, s, c):
         ],
         fill=c,
     )
-    w = max(2, int(s * 0.05))
+    w = _stroke(s)
     cx, cy = s * 0.38, s * 0.50
     for f in [0.22, 0.35, 0.48]:
         d.arc(
@@ -76,7 +80,7 @@ def icon_speaker_muted(d, s, c):
         ],
         fill=c,
     )
-    w = max(2, int(s * 0.06))
+    w = _stroke(s, factor=0.06)
     d.line([(s * 0.62, s * 0.42), (s * 0.74, s * 0.58)], fill=c, width=w)
     d.line([(s * 0.62, s * 0.58), (s * 0.74, s * 0.42)], fill=c, width=w)
 
@@ -84,7 +88,7 @@ def icon_speaker_muted(d, s, c):
 # Microphone
 @icon
 def icon_mic(d, s, c):
-    w = max(2, int(s * 0.05))
+    w = _stroke(s)
     cx, cap_r = s * 0.50, s * 0.16
     d.rounded_rectangle(
         [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
@@ -95,7 +99,7 @@ def icon_mic(d, s, c):
         0,
         180,
         fill=c,
-        width=max(2, int(s * 0.05)),
+        width=_stroke(s),
     )
     d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
     d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
@@ -103,7 +107,7 @@ def icon_mic(d, s, c):
 
 @icon
 def icon_mic_muted(d, s, c):
-    w = max(2, int(s * 0.05))
+    w = _stroke(s)
     cx, cap_r = s * 0.50, s * 0.16
     d.rounded_rectangle(
         [cx - cap_r, s * 0.12, cx + cap_r, s * 0.48], radius=int(cap_r), fill=c
@@ -114,21 +118,21 @@ def icon_mic_muted(d, s, c):
         0,
         180,
         fill=c,
-        width=max(2, int(s * 0.05)),
+        width=_stroke(s),
     )
     d.line([(cx, s * 0.68), (cx, s * 0.88)], fill=c, width=w)
     d.line([(s * 0.36, s * 0.88), (s * 0.64, s * 0.88)], fill=c, width=w)
     d.line(
         [(s * 0.12, s * 0.88), (s * 0.88, s * 0.12)],
         fill=c,
-        width=max(3, int(s * 0.07)),
+        width=_stroke(s, factor=0.07, min_px=3),
     )
 
 
 # Equalizer
 @icon
 def icon_equalizer(d, s, c):
-    w = max(2, int(s * 0.05))
+    w = _stroke(s)
     for x in [0.28, 0.50, 0.72]:
         d.line([(s * x, s * 0.20), (s * x, s * 0.80)], fill=c, width=w)
     r = s * 0.08
@@ -139,7 +143,7 @@ def icon_equalizer(d, s, c):
 # WiFi / Wireless Signal
 @icon
 def icon_wifi(d, s, c):
-    w = max(2, int(s * 0.05))
+    w = _stroke(s)
     cx, cy = s * 0.50, s * 0.72
     r = s * 0.06
     d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
@@ -151,7 +155,7 @@ def icon_wifi(d, s, c):
 # Bluetooth
 @icon
 def icon_bluetooth(d, s, c):
-    w = max(2, int(s * 0.08))
+    w = _stroke(s, factor=0.08)
     d.line(
         [
             (s * 0.32, s * 0.30),
@@ -170,7 +174,7 @@ def icon_bluetooth(d, s, c):
 # Gamepad
 @icon
 def icon_gamepad(d, s, c):
-    w = max(2, int(s * 0.06))
+    w = _stroke(s, factor=0.06)
     d.rounded_rectangle(
         [s * 0.12, s * 0.28, s * 0.88, s * 0.72],
         radius=int(s * 0.16),
@@ -187,7 +191,7 @@ def icon_gamepad(d, s, c):
 # Target / Crosshair
 @icon
 def icon_target(d, s, c):
-    w = max(2, int(s * 0.06))
+    w = _stroke(s, factor=0.06)
     cx = cy = s * 0.50
     r = s * 0.32
     d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=c, width=w)
@@ -202,19 +206,19 @@ def icon_target(d, s, c):
 # Music note
 @icon
 def icon_music(d, s, c):
-    w = max(2, int(s * 0.06))
+    w = _stroke(s, factor=0.06)
     d.ellipse([s * 0.18, s * 0.60, s * 0.38, s * 0.76], fill=c)
     d.ellipse([s * 0.52, s * 0.50, s * 0.72, s * 0.66], fill=c)
     d.line([(s * 0.38, s * 0.68), (s * 0.38, s * 0.22)], fill=c, width=w)
     d.line([(s * 0.72, s * 0.58), (s * 0.72, s * 0.12)], fill=c, width=w)
-    beam_w = max(3, int(s * 0.12))
+    beam_w = _stroke(s, factor=0.12, min_px=3)
     d.line([(s * 0.38, s * 0.22), (s * 0.72, s * 0.12)], fill=c, width=beam_w)
 
 
 # Headset / Connected
 @icon
 def icon_headset(d, s, c):
-    w = max(2, int(s * 0.06))
+    w = _stroke(s, factor=0.06)
     cx, cy = s * 0.50, s * 0.50
     hb_r = s * 0.30
     d.arc([cx - hb_r, cy - hb_r, cx + hb_r, cy + hb_r], 180, 360, fill=c, width=w)
@@ -288,7 +292,7 @@ def icon_lightning(d, s, c):
 # Checkmark
 @icon
 def icon_check(d, s, c):
-    w = max(2, int(s * 0.10))
+    w = _stroke(s, factor=0.10)
     d.line(
         [(s * 0.24, s * 0.50), (s * 0.42, s * 0.68), (s * 0.76, s * 0.28)],
         fill=c,
@@ -307,7 +311,7 @@ def icon_moon(d, s, c):
 # Alert Cross
 @icon
 def icon_cross(d, s, c):
-    w = max(2, int(s * 0.08))
+    w = _stroke(s, factor=0.08)
     d.line([(s * 0.28, s * 0.28), (s * 0.72, s * 0.72)], fill=c, width=w)
     d.line([(s * 0.28, s * 0.72), (s * 0.72, s * 0.28)], fill=c, width=w)
 
