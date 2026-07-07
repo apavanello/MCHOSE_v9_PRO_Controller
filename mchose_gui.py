@@ -40,7 +40,7 @@ ICON_CACHE = {}
 
 def icon(draw_fn):
     def wrapper(size=24, color="#e2e4e9"):
-        key = (draw_fn.__name__, size, color)
+        key = (draw_fn, size, color)
         if key not in ICON_CACHE:
             ICON_CACHE[key] = _make(draw_fn, size, color)
         return ICON_CACHE[key]
