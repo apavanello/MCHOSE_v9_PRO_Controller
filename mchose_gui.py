@@ -532,77 +532,112 @@ class BatteryRing(tk.Canvas):
 
 
 class AudioService:
-    @staticmethod
-    def get_sys_vol(sink=True):
-        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
+    def __init__(self):
+        self._preferred_cmd_sink = None
+        self._preferred_cmd_source = None
+        self._detect_preferred_commands()
+
+    def _detect_preferred_commands(self):
+        # Detect sink command
         for cmd in (
-            ["wpctl", "get-volume", target],
-            ["amixer", "sget", "Master" if sink else "Capture"],
+            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+            ["amixer", "sget", "Master"],
         ):
             try:
-                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-                m = re.search(r"(?:Volume:\s*|(\d+)%)", out)
-                if m:
-                    val = m.group(1)
-                    if val:
-                        return int(val)
-                    m2 = re.search(r"Volume:\s*([0-9.]+)", out)
-                    if m2:
-                        return int(float(m2.group(1)) * 100)
+                subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+                self._preferred_cmd_sink = cmd[0]
+                break
             except Exception:
-                pass
+                continue
+
+        # Detect source command
+        for cmd in (
+            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"],
+            ["amixer", "sget", "Capture"],
+        ):
+            try:
+                subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+                self._preferred_cmd_source = cmd[0]
+                break
+            except Exception:
+                continue
+
+    def get_sys_vol(self, sink=True):
+        cmd_type = self._preferred_cmd_sink if sink else self._preferred_cmd_source
+        if not cmd_type:
+            return 50
+
+        if cmd_type == "wpctl":
+            target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
+            cmd = ["wpctl", "get-volume", target]
+        else:
+            cmd = ["amixer", "sget", "Master" if sink else "Capture"]
+
+        try:
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+            m = re.search(r"(?:Volume:\s*|(\d+)%)", out)
+            if m:
+                val = m.group(1)
+                if val:
+                    return int(val)
+                m2 = re.search(r"Volume:\s*([0-9.]+)", out)
+                if m2:
+                    return int(float(m2.group(1)) * 100)
+        except Exception:
+            pass
         return 50
 
-    @staticmethod
-    def set_sys_vol(value, sink=True):
+    def set_sys_vol(self, value, sink=True):
         value = max(0, min(100, value))
-        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
-        for cmd in (
-            ["wpctl", "set-volume", target, f"{value / 100:.2f}", "-"],
-            ["amixer", "sset", "Master" if sink else "Capture", f"{value}%"],
-        ):
-            try:
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return
-            except Exception:
-                continue
+        cmd_type = self._preferred_cmd_sink if sink else self._preferred_cmd_source
+        if not cmd_type:
+            return
 
-    @staticmethod
-    def set_sys_mic_mute(state):
-        val = "1" if state else "0"
-        for cmd in (
-            ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", val],
-            ["amixer", "sset", "Capture", "mute" if state else "unmute"],
-            ["amixer", "sset", "Mic", "mute" if state else "unmute"],
-        ):
-            try:
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return
-            except Exception:
-                continue
+        if cmd_type == "wpctl":
+            target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
+            cmd = ["wpctl", "set-volume", "-l", "1.0", target, f"{value / 100:.2f}"]
+        else:
+            cmd = ["amixer", "sset", "Master" if sink else "Capture", f"{value}%"]
 
-    @staticmethod
-    def get_mic_status(default_vol):
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def set_sys_mic_mute(self, state):
+        cmd_type = self._preferred_cmd_source
+        if not cmd_type:
+            return
+
+        if cmd_type == "wpctl":
+            val = "1" if state else "0"
+            cmd = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", val]
+        else:
+            cmd = ["amixer", "sset", "Capture", "mute" if state else "unmute"]
+
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def get_mic_status(self, default_vol):
         muted = False
         vol = default_vol
-        try:
-            out = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, stderr=subprocess.DEVNULL)
-            if "[MUTED]" in out:
-                muted = True
-            m = re.search(r"Volume:\s*([0-9.]+)", out)
-            if m:
-                vol = int(float(m.group(1)) * 100)
-        except Exception:
+        cmd_type = self._preferred_cmd_source
+        if not cmd_type:
+            return muted, vol
+
+        if cmd_type == "wpctl":
+            try:
+                out = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, stderr=subprocess.DEVNULL)
+                if "[MUTED]" in out:
+                    muted = True
+                m = re.search(r"Volume:\s*([0-9.]+)", out)
+                if m:
+                    vol = int(float(m.group(1)) * 100)
+            except Exception:
+                pass
+        else:
             try:
                 out = subprocess.check_output(["amixer", "sget", "Capture"], text=True, stderr=subprocess.DEVNULL)
                 if "[off]" in out:
@@ -1529,7 +1564,7 @@ class MchoseBatteryApp(ctk.CTk):
         if self._stop:
             return
         self._refresh_ui_audio_only()
-        self.after(300, self._schedule_audio_poll)
+        self.after(200, self._schedule_audio_poll)
 
     def _refresh_ui_audio_only(self):
         # volume slider
