@@ -322,42 +322,39 @@ def icon_cross(d, s, c):
     d.line([(s * 0.28, s * 0.72), (s * 0.72, s * 0.28)], fill=c, width=w)
 
 
-# Color Palette 
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("dark-blue")
+# Color Palette
+class Theme:
+    BG = "#0b0e14"  # Deep rich dark (main background)
+    SURFACE_1 = "#131720"  # Card surface (primary)
+    SURFACE_2 = "#1a1f2b"  # Card surface (elevated/hover)
+    SURFACE_3 = "#222838"  # Subtle overlay / secondary surface
+    BORDER = "#1e2433"  # Very subtle borders
+    BORDER_HOVER = "#2a3148"  # Borders on hover
 
-# Background & Surface
-BG = "#0b0e14"  # Deep rich dark (main background)
-SURFACE_1 = "#131720"  # Card surface (primary)
-SURFACE_2 = "#1a1f2b"  # Card surface (elevated/hover)
-SURFACE_3 = "#222838"  # Subtle overlay / secondary surface
-BORDER = "#1e2433"  # Very subtle borders
-BORDER_HOVER = "#2a3148"  # Borders on hover
+    # Accent Colors
+    ACCENT_BLUE = "#60a5fa"  # Soft sky blue (volume, primary actions)
+    ACCENT_BLUE_DIM = "#3b82f6"  # Slightly deeper blue
+    ACCENT_INDIGO = "#818cf8"  # Indigo (bluetooth, secondary)
+    ACCENT_GREEN = "#34d399"  # Emerald green (connected, positive)
+    ACCENT_GREEN_DIM = "#10b981"
+    ACCENT_GOLD = "#fbbf24"  # Warm amber/gold (equalizer, highlights)
+    ACCENT_RED = "#f87171"  # Soft red (muted, errors, warning)
+    ACCENT_ORANGE = "#fb923c"  # Orange (charging)
+    ACCENT_PURPLE = "#a78bfa"  # Purple (secondary accent)
+    ACCENT_TEAL = "#2dd4bf"  # Teal accent
 
-# Accent Colors
-ACCENT_BLUE = "#60a5fa"  # Soft sky blue (volume, primary actions)
-ACCENT_BLUE_DIM = "#3b82f6"  # Slightly deeper blue
-ACCENT_INDIGO = "#818cf8"  # Indigo (bluetooth, secondary)
-ACCENT_GREEN = "#34d399"  # Emerald green (connected, positive)
-ACCENT_GREEN_DIM = "#10b981"
-ACCENT_GOLD = "#fbbf24"  # Warm amber/gold (equalizer, highlights)
-ACCENT_RED = "#f87171"  # Soft red (muted, errors, warning)
-ACCENT_ORANGE = "#fb923c"  # Orange (charging)
-ACCENT_PURPLE = "#a78bfa"  # Purple (secondary accent)
-ACCENT_TEAL = "#2dd4bf"  # Teal accent
+    # Text Colors
+    TEXT_PRIMARY = "#f1f5f9"  # Main text (near white)
+    TEXT_SECONDARY = "#94a3b8"  # Secondary text (slate)
+    TEXT_MUTED = "#475569"  # Muted / disabled text
+    TEXT_DIM = "#334155"  # Very dim text
+    TEXT_ON_ACCENT = "#ffffff"  # Text on accent backgrounds
 
-# Text Colors
-TEXT_PRIMARY = "#f1f5f9"  # Main text (near white)
-TEXT_SECONDARY = "#94a3b8"  # Secondary text (slate)
-TEXT_MUTED = "#475569"  # Muted / disabled text
-TEXT_DIM = "#334155"  # Very dim text
-TEXT_ON_ACCENT = "#ffffff"  # Text on accent backgrounds
-
-# Glow & Shadow Colors
-GLOW_BLUE = "#1e3a5f"  # Blue glow background
-GLOW_GREEN = "#064e3b"  # Green glow
-GLOW_RED = "#450a0a"  # Red glow
-GLOW_GOLD = "#451a03"  # Gold glow
+    # Glow & Shadow Colors
+    GLOW_BLUE = "#1e3a5f"  # Blue glow background
+    GLOW_GREEN = "#064e3b"  # Green glow
+    GLOW_RED = "#450a0a"  # Red glow
+    GLOW_GOLD = "#451a03"  # Gold glow
 
 
 # Battery color gradient (green → yellow → red)
@@ -414,7 +411,7 @@ class BatteryRing(tk.Canvas):
 
     def __init__(self, master, size=180, **kw):
         super().__init__(
-            master, width=size, height=size, bg=SURFACE_1, highlightthickness=0, **kw
+            master, width=size, height=size, bg=Theme.SURFACE_1, highlightthickness=0, **kw
         )
         self._size = size
         self._pct = 0
@@ -479,7 +476,7 @@ class BatteryRing(tk.Canvas):
                 pass
 
         # Track (background ring)
-        self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=BORDER, width=w)
+        self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=Theme.BORDER, width=w)
 
         # Gradient arc
         if self._anim_pct > 0:
@@ -518,7 +515,7 @@ class BatteryRing(tk.Canvas):
             cx,
             cy - 4,
             text=f"{int(self._anim_pct)}%",
-            fill=TEXT_PRIMARY,
+            fill=Theme.TEXT_PRIMARY,
             font=("Helvetica", font_size, "bold"),
         )
 
@@ -528,7 +525,7 @@ class BatteryRing(tk.Canvas):
             cx,
             cy + font_size * 0.55,
             text="BATERIA",
-            fill=TEXT_MUTED,
+            fill=Theme.TEXT_MUTED,
             font=("Helvetica", label_size, "normal"),
         )
 
@@ -539,7 +536,7 @@ class MchoseBatteryApp(ctk.CTk):
         self.title("MCHOSE V9 PRO")
         self.geometry("460x850")
         self.minsize(400, 800)
-        self.configure(fg_color=BG)
+        self.configure(fg_color=Theme.BG)
 
         # state
         self.battery_level = 0
@@ -576,7 +573,7 @@ class MchoseBatteryApp(ctk.CTk):
     #
     def _build_ui(self):
         # Scrollable main container
-        self._main = ctk.CTkFrame(self, fg_color=BG)
+        self._main = ctk.CTkFrame(self, fg_color=Theme.BG)
         self._main.pack(fill="both", expand=True, padx=0, pady=0)
         self._main.columnconfigure(0, weight=1)
 
@@ -598,7 +595,7 @@ class MchoseBatteryApp(ctk.CTk):
 
         # Top accent line (decorative)
         accent_bar = ctk.CTkFrame(
-            frame, fg_color=ACCENT_BLUE, height=3, corner_radius=2
+            frame, fg_color=Theme.ACCENT_BLUE, height=3, corner_radius=2
         )
         accent_bar.grid(row=0, column=0, sticky="ew", pady=(0, 20))
 
@@ -607,7 +604,7 @@ class MchoseBatteryApp(ctk.CTk):
             frame,
             text="MCHOSE",
             font=("Helvetica", 14, "bold"),
-            text_color=TEXT_MUTED,
+            text_color=Theme.TEXT_MUTED,
             anchor="w",
         ).grid(row=1, column=0, sticky="w")
 
@@ -615,7 +612,7 @@ class MchoseBatteryApp(ctk.CTk):
             frame,
             text="V9 PRO CONTROLLER",
             font=("Helvetica", 26, "bold"),
-            text_color=TEXT_PRIMARY,
+            text_color=Theme.TEXT_PRIMARY,
             anchor="w",
         ).grid(row=2, column=0, sticky="w", pady=(0, 4))
 
@@ -624,7 +621,7 @@ class MchoseBatteryApp(ctk.CTk):
             frame,
             text="",
             font=("Helvetica", 11),
-            text_color=TEXT_MUTED,
+            text_color=Theme.TEXT_MUTED,
             anchor="w",
         )
         self._fw_label.grid(row=3, column=0, sticky="w", pady=(0, 0))
@@ -639,13 +636,13 @@ class MchoseBatteryApp(ctk.CTk):
 
         # Status badge (below ring)
         self._status_frame = ctk.CTkFrame(
-            card, fg_color=SURFACE_3, corner_radius=20, height=32
+            card, fg_color=Theme.SURFACE_3, corner_radius=20, height=32
         )
         self._status_frame.pack(pady=(4, 16), padx=20)
         self._status_frame.pack_propagate(False)
 
         self._status_icon = ctk.CTkLabel(
-            self._status_frame, image=icon_cross(14, ACCENT_RED), text=""
+            self._status_frame, image=icon_cross(14, Theme.ACCENT_RED), text=""
         )
         self._status_icon.pack(side="left", padx=(12, 4))
 
@@ -653,7 +650,7 @@ class MchoseBatteryApp(ctk.CTk):
             self._status_frame,
             text="Fone não detectado",
             font=("Helvetica", 11, "bold"),
-            text_color=ACCENT_RED,
+            text_color=Theme.ACCENT_RED,
         )
         self._status_label.pack(side="left", padx=(0, 12))
 
@@ -669,7 +666,7 @@ class MchoseBatteryApp(ctk.CTk):
         left.pack(side="left")
 
         self._conn_icon_cv = ctk.CTkLabel(
-            left, image=icon_headset(20, TEXT_MUTED), text=""
+            left, image=icon_headset(20, Theme.TEXT_MUTED), text=""
         )
         self._conn_icon_cv.pack(side="left", padx=(0, 8))
 
@@ -680,7 +677,7 @@ class MchoseBatteryApp(ctk.CTk):
             info_frame,
             text="Desconectado",
             font=("Helvetica", 12, "bold"),
-            text_color=TEXT_MUTED,
+            text_color=Theme.TEXT_MUTED,
             anchor="w",
         )
         self._conn_text.pack(anchor="w")
@@ -689,17 +686,17 @@ class MchoseBatteryApp(ctk.CTk):
             info_frame,
             text="Aguardando conexão...",
             font=("Helvetica", 10),
-            text_color=TEXT_DIM,
+            text_color=Theme.TEXT_DIM,
             anchor="w",
         )
         self._conn_mode_label.pack(anchor="w")
 
         # Right side: connection indicator dot
         self._conn_dot = tk.Canvas(
-            conn_row, width=10, height=10, bg=SURFACE_1, highlightthickness=0
+            conn_row, width=10, height=10, bg=Theme.SURFACE_1, highlightthickness=0
         )
         self._conn_dot.pack(side="right")
-        self._draw_dot(TEXT_DIM)
+        self._draw_dot(Theme.TEXT_DIM)
 
     def _draw_dot(self, color):
         self._conn_dot.delete("all")
@@ -716,21 +713,21 @@ class MchoseBatteryApp(ctk.CTk):
         left = ctk.CTkFrame(header, fg_color="transparent")
         left.pack(side="left")
 
-        vol_icon = ctk.CTkLabel(left, image=icon_speaker(18, ACCENT_BLUE), text="")
+        vol_icon = ctk.CTkLabel(left, image=icon_speaker(18, Theme.ACCENT_BLUE), text="")
         vol_icon.pack(side="left", padx=(0, 8))
 
         ctk.CTkLabel(
             left,
             text="Volume",
             font=("Helvetica", 13, "bold"),
-            text_color=TEXT_PRIMARY,
+            text_color=Theme.TEXT_PRIMARY,
         ).pack(side="left")
 
         self._vol_pct = ctk.CTkLabel(
             header,
             text="50%",
             font=("Helvetica", 14, "bold"),
-            text_color=ACCENT_BLUE,
+            text_color=Theme.ACCENT_BLUE,
         )
         self._vol_pct.pack(side="right")
 
@@ -741,9 +738,9 @@ class MchoseBatteryApp(ctk.CTk):
             to=100,
             number_of_steps=100,
             command=self._on_vol_slide,
-            button_color=ACCENT_BLUE,
+            button_color=Theme.ACCENT_BLUE,
             button_hover_color="#93c5fd",
-            progress_color=ACCENT_BLUE,
+            progress_color=Theme.ACCENT_BLUE,
             button_length=22,
             button_corner_radius=11,
             height=20,
@@ -777,7 +774,7 @@ class MchoseBatteryApp(ctk.CTk):
         left.pack(side="left")
 
         self._mic_icon_cv = ctk.CTkLabel(
-            left, image=icon_mic(18, ACCENT_GREEN), text=""
+            left, image=icon_mic(18, Theme.ACCENT_GREEN), text=""
         )
         self._mic_icon_cv.pack(side="left", padx=(0, 8))
 
@@ -785,7 +782,7 @@ class MchoseBatteryApp(ctk.CTk):
             left,
             text="Microfone",
             font=("Helvetica", 13, "bold"),
-            text_color=TEXT_PRIMARY,
+            text_color=Theme.TEXT_PRIMARY,
         ).pack(side="left")
 
         # Container for switch and percentage on the right
@@ -800,10 +797,10 @@ class MchoseBatteryApp(ctk.CTk):
             offvalue=0,
             command=self._on_mic_switch,
             font=("Helvetica", 11),
-            button_color=ACCENT_RED if self.mic_muted else ACCENT_GREEN,
+            button_color=Theme.ACCENT_RED if self.mic_muted else Theme.ACCENT_GREEN,
             button_hover_color="#fca5a5" if self.mic_muted else "#6ee7b7",
-            progress_color=ACCENT_RED,
-            text_color=TEXT_SECONDARY,
+            progress_color=Theme.ACCENT_RED,
+            text_color=Theme.TEXT_SECONDARY,
         )
         self._mic_switch.pack(side="left", padx=(0, 16))
         if self.mic_muted:
@@ -816,7 +813,7 @@ class MchoseBatteryApp(ctk.CTk):
             width=45,
             anchor="e",
             font=("Helvetica", 14, "bold"),
-            text_color=ACCENT_RED if self.mic_muted else ACCENT_GREEN,
+            text_color=Theme.ACCENT_RED if self.mic_muted else Theme.ACCENT_GREEN,
         )
         self._mic_pct.pack(side="left")
 
@@ -827,9 +824,9 @@ class MchoseBatteryApp(ctk.CTk):
             to=100,
             number_of_steps=100,
             command=self._on_mic_slide,
-            button_color=ACCENT_GREEN,
+            button_color=Theme.ACCENT_GREEN,
             button_hover_color="#6ee7b7",
-            progress_color=ACCENT_GREEN,
+            progress_color=Theme.ACCENT_GREEN,
             button_length=22,
             button_corner_radius=11,
             height=20,
@@ -879,7 +876,7 @@ class MchoseBatteryApp(ctk.CTk):
 
     def _update_mic_visuals(self):
         is_red = self.mic_muted or (self.mic_level == 0)
-        color = ACCENT_RED if is_red else ACCENT_GREEN
+        color = Theme.ACCENT_RED if is_red else Theme.ACCENT_GREEN
         hover = "#fca5a5" if is_red else "#6ee7b7"
 
         self._mic_icon_cv.configure(
@@ -973,21 +970,21 @@ class MchoseBatteryApp(ctk.CTk):
         left = ctk.CTkFrame(top, fg_color="transparent")
         left.pack(side="left")
 
-        eq_icon = ctk.CTkLabel(left, image=icon_equalizer(18, ACCENT_GOLD), text="")
+        eq_icon = ctk.CTkLabel(left, image=icon_equalizer(18, Theme.ACCENT_GOLD), text="")
         eq_icon.pack(side="left", padx=(0, 8))
 
         ctk.CTkLabel(
             left,
             text="Equalizador",
             font=("Helvetica", 13, "bold"),
-            text_color=ACCENT_GOLD,
+            text_color=Theme.ACCENT_GOLD,
         ).pack(side="left")
 
         self._eq_hint = ctk.CTkLabel(
             top,
             text="",
             font=("Helvetica", 10),
-            text_color=TEXT_MUTED,
+            text_color=Theme.TEXT_MUTED,
         )
         self._eq_hint.pack(side="right")
 
@@ -1011,16 +1008,16 @@ class MchoseBatteryApp(ctk.CTk):
                 corner_radius=12,
                 font=("Helvetica", 12, "bold"),
                 height=40,
-                fg_color=SURFACE_2,
-                hover_color=SURFACE_3,
+                fg_color=Theme.SURFACE_2,
+                hover_color=Theme.SURFACE_3,
                 border_width=1,
-                border_color=BORDER,
-                text_color=TEXT_SECONDARY,
+                border_color=Theme.BORDER,
+                text_color=Theme.TEXT_SECONDARY,
                 command=lambda m=i: self._change_eq(m),
             )
             btn.grid(row=0, column=i, sticky="ew", padx=4)
             self._eq_btns.append(btn)
-            img = icon_fn(14, TEXT_SECONDARY)
+            img = icon_fn(14, Theme.TEXT_SECONDARY)
             self._eq_icon_imgs.append(img)
             btn.configure(image=img, compound="left")
 
@@ -1038,28 +1035,28 @@ class MchoseBatteryApp(ctk.CTk):
         for i, btn in enumerate(self._eq_btns):
             if i == self.eq_mode and enabled:
                 btn.configure(
-                    fg_color=ACCENT_GOLD,
+                    fg_color=Theme.ACCENT_GOLD,
                     hover_color="#fcd34d",
                     text_color="#000000",
-                    border_color=ACCENT_GOLD,
+                    border_color=Theme.ACCENT_GOLD,
                 )
                 ic_color = "#000000"
             elif enabled:
                 btn.configure(
-                    fg_color=SURFACE_2,
-                    hover_color=SURFACE_3,
-                    text_color=TEXT_SECONDARY,
-                    border_color=BORDER,
+                    fg_color=Theme.SURFACE_2,
+                    hover_color=Theme.SURFACE_3,
+                    text_color=Theme.TEXT_SECONDARY,
+                    border_color=Theme.BORDER,
                 )
-                ic_color = TEXT_SECONDARY
+                ic_color = Theme.TEXT_SECONDARY
             else:
                 btn.configure(
-                    fg_color=BG,
-                    hover_color=BG,
-                    text_color=TEXT_DIM,
+                    fg_color=Theme.BG,
+                    hover_color=Theme.BG,
+                    text_color=Theme.TEXT_DIM,
                     border_color="#151a24",
                 )
-                ic_color = TEXT_DIM
+                ic_color = Theme.TEXT_DIM
             icon_fn = self._eq_data[i][1]
             self._eq_icon_imgs[i] = icon_fn(14, ic_color)
             btn.configure(image=self._eq_icon_imgs[i])
@@ -1077,10 +1074,10 @@ class MchoseBatteryApp(ctk.CTk):
     def _make_card(self, row, pady_top=8):
         f = ctk.CTkFrame(
             self._main,
-            fg_color=SURFACE_1,
+            fg_color=Theme.SURFACE_1,
             corner_radius=16,
             border_width=1,
-            border_color=BORDER,
+            border_color=Theme.BORDER,
         )
         f.grid(row=row, column=0, sticky="ew", padx=20, pady=(pady_top, 0))
         return f
@@ -1093,15 +1090,15 @@ class MchoseBatteryApp(ctk.CTk):
 
         if self.connected:
             mode = self.connection_mode or ""
-            icon_color = ACCENT_INDIGO if mode == "Bluetooth" else ACCENT_GREEN
-            dot_color = ACCENT_INDIGO if mode == "Bluetooth" else ACCENT_GREEN
+            icon_color = Theme.ACCENT_INDIGO if mode == "Bluetooth" else Theme.ACCENT_GREEN
+            dot_color = Theme.ACCENT_INDIGO if mode == "Bluetooth" else Theme.ACCENT_GREEN
 
             if mode == "Bluetooth":
                 self._conn_icon_cv.configure(image=icon_bluetooth(20, icon_color))
             else:
                 self._conn_icon_cv.configure(image=icon_wifi(20, icon_color))
 
-            self._conn_text.configure(text="Conectado", text_color=TEXT_PRIMARY)
+            self._conn_text.configure(text="Conectado", text_color=Theme.TEXT_PRIMARY)
             self._conn_mode_label.configure(text=mode, text_color=icon_color)
             self._draw_dot(dot_color)
 
@@ -1109,27 +1106,27 @@ class MchoseBatteryApp(ctk.CTk):
             status_map = {
                 0x02: (
                     "Em uso",
-                    icon_battery_status(14, ACCENT_GREEN),
-                    ACCENT_GREEN,
-                    GLOW_GREEN,
+                    icon_battery_status(14, Theme.ACCENT_GREEN),
+                    Theme.ACCENT_GREEN,
+                    Theme.GLOW_GREEN,
                 ),
                 0x03: (
                     "Carregando...",
-                    icon_lightning(14, ACCENT_ORANGE),
-                    ACCENT_ORANGE,
-                    GLOW_GOLD,
+                    icon_lightning(14, Theme.ACCENT_ORANGE),
+                    Theme.ACCENT_ORANGE,
+                    Theme.GLOW_GOLD,
                 ),
                 0x04: (
                     "Carregado (100%)",
-                    icon_check(14, ACCENT_GREEN),
-                    ACCENT_GREEN,
-                    GLOW_GREEN,
+                    icon_check(14, Theme.ACCENT_GREEN),
+                    Theme.ACCENT_GREEN,
+                    Theme.GLOW_GREEN,
                 ),
                 0x1A: (
                     "Modo de Suspensão",
-                    icon_moon(14, TEXT_SECONDARY),
-                    TEXT_SECONDARY,
-                    SURFACE_3,
+                    icon_moon(14, Theme.TEXT_SECONDARY),
+                    Theme.TEXT_SECONDARY,
+                    Theme.SURFACE_3,
                 ),
             }
 
@@ -1140,32 +1137,32 @@ class MchoseBatteryApp(ctk.CTk):
                 else:
                     txt, img, txt_color, bg = (
                         f"Status: {hex(self.status_code)}",
-                        icon_battery_status(14, ACCENT_GREEN),
-                        ACCENT_GREEN,
-                        GLOW_GREEN,
+                        icon_battery_status(14, Theme.ACCENT_GREEN),
+                        Theme.ACCENT_GREEN,
+                        Theme.GLOW_GREEN,
                     )
             else:
                 txt = "Bluetooth conectado"
-                img = icon_bluetooth(14, ACCENT_INDIGO)
-                txt_color = ACCENT_INDIGO
-                bg = GLOW_BLUE
+                img = icon_bluetooth(14, Theme.ACCENT_INDIGO)
+                txt_color = Theme.ACCENT_INDIGO
+                bg = Theme.GLOW_BLUE
 
             self._status_label.configure(text=txt, text_color=txt_color)
             self._status_icon.configure(image=img)
             self._status_frame.configure(fg_color=bg)
 
         else:
-            self._conn_icon_cv.configure(image=icon_headset(20, TEXT_DIM))
-            self._conn_text.configure(text="Desconectado", text_color=TEXT_MUTED)
+            self._conn_icon_cv.configure(image=icon_headset(20, Theme.TEXT_DIM))
+            self._conn_text.configure(text="Desconectado", text_color=Theme.TEXT_MUTED)
             self._conn_mode_label.configure(
-                text="Aguardando conexão...", text_color=TEXT_DIM
+                text="Aguardando conexão...", text_color=Theme.TEXT_DIM
             )
-            self._draw_dot(TEXT_DIM)
+            self._draw_dot(Theme.TEXT_DIM)
             self._status_label.configure(
-                text="Fone não detectado", text_color=ACCENT_RED
+                text="Fone não detectado", text_color=Theme.ACCENT_RED
             )
-            self._status_icon.configure(image=icon_cross(14, ACCENT_RED))
-            self._status_frame.configure(fg_color=GLOW_RED)
+            self._status_icon.configure(image=icon_cross(14, Theme.ACCENT_RED))
+            self._status_frame.configure(fg_color=Theme.GLOW_RED)
             self.fw_dongle = ""
             self.fw_headset = ""
 
