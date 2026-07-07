@@ -530,6 +530,279 @@ class BatteryRing(tk.Canvas):
         )
 
 
+class AudioService:
+    @staticmethod
+    def get_sys_vol(sink=True):
+        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
+        for cmd in (
+            ["wpctl", "get-volume", target],
+            ["amixer", "sget", "Master" if sink else "Capture"],
+        ):
+            try:
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+                m = re.search(r"(?:Volume:\s*|(\d+)%)", out)
+                if m:
+                    val = m.group(1)
+                    if val:
+                        return int(val)
+                    m2 = re.search(r"Volume:\s*([0-9.]+)", out)
+                    if m2:
+                        return int(float(m2.group(1)) * 100)
+            except Exception:
+                pass
+        return 50
+
+    @staticmethod
+    def set_sys_vol(value, sink=True):
+        value = max(0, min(100, value))
+        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
+        for cmd in (
+            ["wpctl", "set-volume", target, f"{value / 100:.2f}", "-"],
+            ["amixer", "sset", "Master" if sink else "Capture", f"{value}%"],
+        ):
+            try:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return
+            except Exception:
+                continue
+
+    @staticmethod
+    def set_sys_mic_mute(state):
+        val = "1" if state else "0"
+        for cmd in (
+            ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", val],
+            ["amixer", "sset", "Capture", "mute" if state else "unmute"],
+            ["amixer", "sset", "Mic", "mute" if state else "unmute"],
+        ):
+            try:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return
+            except Exception:
+                continue
+
+    @staticmethod
+    def get_mic_status(default_vol):
+        muted = False
+        vol = default_vol
+        try:
+            out = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, stderr=subprocess.DEVNULL)
+            if "[MUTED]" in out:
+                muted = True
+            m = re.search(r"Volume:\s*([0-9.]+)", out)
+            if m:
+                vol = int(float(m.group(1)) * 100)
+        except Exception:
+            try:
+                out = subprocess.check_output(["amixer", "sget", "Capture"], text=True, stderr=subprocess.DEVNULL)
+                if "[off]" in out:
+                    muted = True
+                m = re.search(r"(\d+)%", out)
+                if m:
+                    vol = int(m.group(1))
+            except Exception:
+                pass
+        return muted, vol
+
+
+class BluetoothService:
+    @staticmethod
+    def query_bluetooth():
+        if not HAS_DBUS:
+            return False, 0
+        try:
+            bus = dbus.SystemBus()
+            mgr = dbus.Interface(
+                bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager"
+            )
+            for path, ifaces in mgr.GetManagedObjects().items():
+                dev = ifaces.get("org.bluez.Device1")
+                if not dev:
+                    continue
+                name = dev.get("Name", dev.get("Alias", ""))
+                if "MCHOSE V9 PRO" in name or "V9 PRO" in name:
+                    if dev.get("Connected", False):
+                        bat = ifaces.get("org.bluez.Battery1")
+                        pct = int(bat.get("Percentage", 100)) if bat else 100
+                        return True, pct
+        except Exception:
+            pass
+        return False, 0
+
+
+class HIDService:
+    def __init__(self):
+        self.hid = None
+        self._init_hid()
+
+    def _init_hid(self):
+        for lib in ("libhidapi-hidraw.so.0", "libhidapi-hidraw.so", "/usr/lib/x86_64-linux-gnu/libhidapi-hidraw.so.0"):
+            try:
+                self.hid = ctypes.CDLL(lib)
+                break
+            except Exception:
+                continue
+
+        if not self.hid:
+            try:
+                lib_name = ctypes.util.find_library("hidapi-hidraw")
+                if lib_name:
+                    self.hid = ctypes.CDLL(lib_name)
+            except Exception:
+                pass
+
+        if not self.hid:
+            return
+
+        try:
+            self.hid.hid_open.argtypes = [
+                ctypes.c_ushort,
+                ctypes.c_ushort,
+                ctypes.c_wchar_p,
+            ]
+            self.hid.hid_open.restype = ctypes.c_void_p
+            self.hid.hid_write.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_size_t,
+            ]
+            self.hid.hid_write.restype = ctypes.c_int
+            self.hid.hid_read_timeout.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_size_t,
+                ctypes.c_int,
+            ]
+            self.hid.hid_read_timeout.restype = ctypes.c_int
+            self.hid.hid_send_feature_report.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_size_t,
+            ]
+            self.hid.hid_send_feature_report.restype = ctypes.c_int
+            self.hid.hid_get_feature_report.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_char_p,
+                ctypes.c_size_t,
+            ]
+            self.hid.hid_get_feature_report.restype = ctypes.c_int
+            self.hid.hid_close.argtypes = [ctypes.c_void_p]
+            self.hid.hid_close.restype = None
+            self.hid.hid_exit.argtypes = []
+            self.hid.hid_exit.restype = ctypes.c_int
+        except Exception:
+            self.hid = None
+
+    def query_status(self, current_eq_mode):
+        if not self.hid:
+            return False, 0, 0, 0
+        handle = self.hid.hid_open(0x291D, 0x385D, None)
+        if not handle:
+            return False, 0, 0, 0
+        battery = status_code = eq_mode = 0
+        ok_bat = ok_eq = False
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2] = 0x55, 0x65, 0x01
+            c_buf = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_write(handle, c_buf, 64) > 0:
+                rbuf = bytearray(64)
+                c_r = (ctypes.c_char * 64).from_buffer(rbuf)
+                if self.hid.hid_read_timeout(handle, c_r, 64, 500) > 0:
+                    d = list(rbuf)
+                    if d[0] == 0x55 and d[1] == 0x65:
+                        battery, status_code = d[2], d[3]
+                        ok_bat = True
+            buf2 = bytearray(64)
+            buf2[0], buf2[1] = 0x55, 0x11
+            c2 = (ctypes.c_char * 64).from_buffer(buf2)
+            if self.hid.hid_write(handle, c2, 64) > 0:
+                r2 = bytearray(64)
+                c_r2 = (ctypes.c_char * 64).from_buffer(r2)
+                if self.hid.hid_read_timeout(handle, c_r2, 64, 500) > 0:
+                    d2 = list(r2)
+                    if d2[0] == 0x55 and d2[1] == 0x11:
+                        eq_mode = d2[2]
+                        ok_eq = True
+        except Exception:
+            pass
+        finally:
+            self.hid.hid_close(handle)
+        if ok_bat:
+            return True, battery, status_code, eq_mode if ok_eq else current_eq_mode
+        return False, 0, 0, 0
+
+    def send_eq_command(self, mode):
+        if not self.hid:
+            return False, mode
+        handle = self.hid.hid_open(0x291D, 0x385D, None)
+        if not handle:
+            return False, mode
+        new_mode = mode
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2], buf[3] = 0x55, 0x21, 0x01, mode
+            c = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_write(handle, c, 64) <= 0:
+                return False, mode
+            time.sleep(0.05)
+            q = bytearray(64)
+            q[0], q[1] = 0x55, 0x11
+            cq = (ctypes.c_char * 64).from_buffer(q)
+            self.hid.hid_write(handle, cq, 64)
+            rb = bytearray(64)
+            cr = (ctypes.c_char * 64).from_buffer(rb)
+            if self.hid.hid_read_timeout(handle, cr, 64, 300) > 2:
+                if rb[0] == 0x55 and rb[1] == 0x11:
+                    new_mode = int(rb[2])
+            return True, new_mode
+        except Exception:
+            return False, mode
+        finally:
+            self.hid.hid_close(handle)
+
+    def get_firmware(self):
+        if not self.hid:
+            return "", ""
+        handle = self.hid.hid_open(0x291D, 0x385D, None)
+        if not handle:
+            return "", ""
+        fw_dongle = fw_headset = ""
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2] = 0xAA, 0x01, 0x00
+            c = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_send_feature_report(handle, c, 64) <= 0:
+                return "", ""
+            for delay in (0.3, 0.5, 0.9):
+                time.sleep(delay)
+                rb = bytearray(64)
+                rb[0] = 0xAA
+                c_r = (ctypes.c_char * 64).from_buffer(rb)
+                if self.hid.hid_get_feature_report(handle, c_r, 64) > 0:
+                    d = list(rb)
+                    if d[0] == 0xAA:
+                        if len(d) >= 10:
+                            fw_dongle = f"{d[8]:02d}{d[9]:02d}"
+                        if len(d) >= 12:
+                            fw_headset = f"{d[10]:02d}{d[11]:02d}"
+                        break
+        except Exception:
+            pass
+        finally:
+            self.hid.hid_close(handle)
+        return fw_dongle, fw_headset
+
+
 class MchoseBatteryApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -552,9 +825,10 @@ class MchoseBatteryApp(ctk.CTk):
         self._dragging_vol = False
         self._dragging_mic = False
 
-        # HID
-        self.hid = None
-        self._init_hid()
+        # Services
+        self.hid_service = HIDService()
+        self.audio_service = AudioService()
+        self.bluetooth_service = BluetoothService()
 
         # UI
         self._build_ui()
@@ -760,7 +1034,7 @@ class MchoseBatteryApp(ctk.CTk):
         v = int(val)
         self.volume_level = v
         self._vol_pct.configure(text=f"{v}%")
-        threading.Thread(target=self._set_sys_vol, args=(v,), daemon=True).start()
+        threading.Thread(target=self.audio_service.set_sys_vol, args=(v,), daemon=True).start()
 
     # microphone card
     def _build_mic_card(self):
@@ -850,10 +1124,10 @@ class MchoseBatteryApp(ctk.CTk):
         self._update_mic_visuals()
 
         threading.Thread(
-            target=self._set_sys_mic_mute, args=(self.mic_muted,), daemon=True
+            target=self.audio_service.set_sys_mic_mute, args=(self.mic_muted,), daemon=True
         ).start()
         if not self.mic_muted:
-            threading.Thread(target=self._set_sys_vol, args=(self.mic_level, False), daemon=True).start()
+            threading.Thread(target=self.audio_service.set_sys_vol, args=(self.mic_level, False), daemon=True).start()
 
     def _on_mic_slide(self, val):
         self._dragging_mic = True
@@ -865,14 +1139,14 @@ class MchoseBatteryApp(ctk.CTk):
             self.mic_level = v
             if self.mic_muted:
                 self.mic_muted = False
-                threading.Thread(target=self._set_sys_mic_mute, args=(False,), daemon=True).start()
+                threading.Thread(target=self.audio_service.set_sys_mic_mute, args=(False,), daemon=True).start()
         else:
             if not self.mic_muted:
                 self.mic_muted = True
-                threading.Thread(target=self._set_sys_mic_mute, args=(True,), daemon=True).start()
+                threading.Thread(target=self.audio_service.set_sys_mic_mute, args=(True,), daemon=True).start()
 
         self._update_mic_visuals()
-        threading.Thread(target=self._set_sys_vol, args=(v, False), daemon=True).start()
+        threading.Thread(target=self.audio_service.set_sys_vol, args=(v, False), daemon=True).start()
 
     def _update_mic_visuals(self):
         is_red = self.mic_muted or (self.mic_level == 0)
@@ -1026,9 +1300,12 @@ class MchoseBatteryApp(ctk.CTk):
     def _change_eq(self, mode):
         self.eq_mode = mode
         self._update_eq_buttons()
-        threading.Thread(
-            target=self._send_eq_command, args=(mode,), daemon=True
-        ).start()
+        def run():
+            ok, new_mode = self.hid_service.send_eq_command(mode)
+            if ok:
+                self.eq_mode = new_mode
+                self._ui(self._update_eq_buttons)
+        threading.Thread(target=run, daemon=True).start()
 
     def _update_eq_buttons(self):
         enabled = self.connected and self.connection_mode == "2.4G"
@@ -1178,284 +1455,11 @@ class MchoseBatteryApp(ctk.CTk):
 
         self._update_eq_buttons()
 
-    # HID helpers
-    def _init_hid(self):
-        candidates = [
-            ctypes.util.find_library("hidapi-hidraw"),
-            "libhidapi-hidraw.so.0",
-            "libhidapi-hidraw.so",
-            "/usr/lib/x86_64-linux-gnu/libhidapi-hidraw.so.0",
-        ]
-        for lib_path in (p for p in candidates if p):
-            try:
-                self.hid = ctypes.CDLL(lib_path)
-                break
-            except Exception:
-                continue
-        else:
-            return
-
-        try:
-            self.hid.hid_init()
-            self.hid.hid_open.argtypes = [
-                ctypes.c_ushort,
-                ctypes.c_ushort,
-                ctypes.c_wchar_p,
-            ]
-            self.hid.hid_open.restype = ctypes.c_void_p
-            self.hid.hid_write.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_size_t,
-            ]
-            self.hid.hid_write.restype = ctypes.c_int
-            self.hid.hid_read_timeout.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_size_t,
-                ctypes.c_int,
-            ]
-            self.hid.hid_read_timeout.restype = ctypes.c_int
-            self.hid.hid_send_feature_report.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_size_t,
-            ]
-            self.hid.hid_send_feature_report.restype = ctypes.c_int
-            self.hid.hid_get_feature_report.argtypes = [
-                ctypes.c_void_p,
-                ctypes.c_char_p,
-                ctypes.c_size_t,
-            ]
-            self.hid.hid_get_feature_report.restype = ctypes.c_int
-            self.hid.hid_close.argtypes = [ctypes.c_void_p]
-            self.hid.hid_close.restype = None
-            self.hid.hid_exit.argtypes = []
-            self.hid.hid_exit.restype = ctypes.c_int
-        except Exception:
-            self.hid = None
-
-    def _query_hid(self):
-        if not self.hid:
-            return False, 0, 0, 0
-        handle = self.hid.hid_open(0x291D, 0x385D, None)
-        if not handle:
-            return False, 0, 0, 0
-        battery = status_code = eq_mode = 0
-        ok_bat = ok_eq = False
-        try:
-            buf = bytearray(64)
-            buf[0], buf[1], buf[2] = 0x55, 0x65, 0x01
-            c_buf = (ctypes.c_char * 64).from_buffer(buf)
-            if self.hid.hid_write(handle, c_buf, 64) > 0:
-                rbuf = bytearray(64)
-                c_r = (ctypes.c_char * 64).from_buffer(rbuf)
-                if self.hid.hid_read_timeout(handle, c_r, 64, 500) > 0:
-                    d = list(rbuf)
-                    if d[0] == 0x55 and d[1] == 0x65:
-                        battery, status_code = d[2], d[3]
-                        ok_bat = True
-            buf2 = bytearray(64)
-            buf2[0], buf2[1] = 0x55, 0x11
-            c2 = (ctypes.c_char * 64).from_buffer(buf2)
-            if self.hid.hid_write(handle, c2, 64) > 0:
-                r2 = bytearray(64)
-                c_r2 = (ctypes.c_char * 64).from_buffer(r2)
-                if self.hid.hid_read_timeout(handle, c_r2, 64, 500) > 0:
-                    d2 = list(r2)
-                    if d2[0] == 0x55 and d2[1] == 0x11:
-                        eq_mode = d2[2]
-                        ok_eq = True
-        except Exception:
-            pass
-        finally:
-            self.hid.hid_close(handle)
-        if ok_bat:
-            return True, battery, status_code, eq_mode if ok_eq else self.eq_mode
-        return False, 0, 0, 0
-
-    def _send_eq_command(self, mode):
-        if not self.hid:
-            return False
-        handle = self.hid.hid_open(0x291D, 0x385D, None)
-        if not handle:
-            return False
-        try:
-            buf = bytearray(64)
-            buf[0], buf[1], buf[2], buf[3] = 0x55, 0x21, 0x01, mode
-            c = (ctypes.c_char * 64).from_buffer(buf)
-            if self.hid.hid_write(handle, c, 64) <= 0:
-                return False
-            time.sleep(0.05)
-            q = bytearray(64)
-            q[0], q[1] = 0x55, 0x11
-            cq = (ctypes.c_char * 64).from_buffer(q)
-            self.hid.hid_write(handle, cq, 64)
-            rb = bytearray(64)
-            cr = (ctypes.c_char * 64).from_buffer(rb)
-            if self.hid.hid_read_timeout(handle, cr, 64, 300) > 2:
-                if rb[0] == 0x55 and rb[1] == 0x11:
-                    self.eq_mode = int(rb[2])
-            return True
-        except Exception:
-            return False
-        finally:
-            self.hid.hid_close(handle)
-
-    def _get_firmware(self):
-        if not self.hid:
-            return "", ""
-        handle = self.hid.hid_open(0x291D, 0x385D, None)
-        if not handle:
-            return "", ""
-        fw_dongle = fw_headset = ""
-        try:
-            buf = bytearray(64)
-            buf[0], buf[1], buf[2] = 0xAA, 0x01, 0x00
-            c = (ctypes.c_char * 64).from_buffer(buf)
-            if self.hid.hid_send_feature_report(handle, c, 64) <= 0:
-                return "", ""
-            for delay in (0.3, 0.5, 0.9):
-                time.sleep(delay)
-                rb = bytearray(64)
-                rb[0] = 0xAA
-                cr = (ctypes.c_char * 64).from_buffer(rb)
-                if self.hid.hid_get_feature_report(handle, cr, 64) > 0:
-                    d = list(rb)
-                    if d[0] == 0xAA:
-                        if len(d) >= 10:
-                            fw_dongle = f"{d[8]:02d}{d[9]:02d}"
-                        if len(d) >= 12:
-                            fw_headset = f"{d[10]:02d}{d[11]:02d}"
-                        break
-        except Exception:
-            pass
-        finally:
-            self.hid.hid_close(handle)
-        return fw_dongle, fw_headset
-
-    # Bluetooth (D-Bus / BlueZ)
-    def _query_bluetooth(self):
-        if not HAS_DBUS:
-            return False, 0
-        try:
-            bus = dbus.SystemBus()
-            mgr = dbus.Interface(
-                bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager"
-            )
-            for path, ifaces in mgr.GetManagedObjects().items():
-                dev = ifaces.get("org.bluez.Device1")
-                if not dev:
-                    continue
-                name = dev.get("Name", dev.get("Alias", ""))
-                if "MCHOSE V9 PRO" in name or "V9 PRO" in name:
-                    if dev.get("Connected", False):
-                        bat = ifaces.get("org.bluez.Battery1")
-                        pct = int(bat.get("Percentage", 100)) if bat else 100
-                        return True, pct
-        except Exception:
-            pass
-        return False, 0
-
-    # System audio helpers
-    @staticmethod
-    def _get_sys_vol(sink=True):
-        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
-        for cmd in (
-            ["wpctl", "get-volume", target],
-            ["amixer", "sget", "Master" if sink else "Capture"],
-        ):
-            try:
-                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-                m = re.search(r"(?:Volume:\s*|(\d+)%)", out)
-                if m:
-                    val = m.group(1)
-                    if val:
-                        return int(val)
-                    m2 = re.search(r"Volume:\s*([0-9.]+)", out)
-                    if m2:
-                        return int(float(m2.group(1)) * 100)
-            except Exception:
-                pass
-        return 50
-
-    @staticmethod
-    def _set_sys_vol(value, sink=True):
-        value = max(0, min(100, value))
-        target = "@DEFAULT_AUDIO_SINK@" if sink else "@DEFAULT_AUDIO_SOURCE@"
-        for cmd in (
-            ["wpctl", "set-volume", target, f"{value / 100:.2f}", "-"],
-            ["amixer", "sset", "Master" if sink else "Capture", f"{value}%"],
-        ):
-            try:
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return
-            except Exception:
-                continue
-
-    @staticmethod
-    def _get_sys_mic_mute():
-        for cmd in (
-            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"],
-            ["amixer", "sget", "Capture"],
-            ["amixer", "sget", "Mic"],
-        ):
-            try:
-                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-                if "[MUTED]" in out or "[off]" in out:
-                    return True
-            except Exception:
-                pass
-        return False
-
-    @staticmethod
-    def _set_sys_mic_mute(state):
-        val = "1" if state else "0"
-        for cmd in (
-            ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", val],
-            ["amixer", "sset", "Capture", "mute" if state else "unmute"],
-            ["amixer", "sset", "Mic", "mute" if state else "unmute"],
-        ):
-            try:
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return
-            except Exception:
-                continue
-
     def _refresh_system_audio(self):
         if not self._dragging_vol:
-            self.volume_level = self._get_sys_vol(sink=True)
+            self.volume_level = self.audio_service.get_sys_vol(sink=True)
 
-        muted = False
-        vol = self.mic_level
-        try:
-            out = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, stderr=subprocess.DEVNULL)
-            if "[MUTED]" in out:
-                muted = True
-            m = re.search(r"Volume:\s*([0-9.]+)", out)
-            if m:
-                vol = int(float(m.group(1)) * 100)
-        except Exception:
-            try:
-                out = subprocess.check_output(["amixer", "sget", "Capture"], text=True, stderr=subprocess.DEVNULL)
-                if "[off]" in out:
-                    muted = True
-                m = re.search(r"(\d+)%", out)
-                if m:
-                    vol = int(m.group(1))
-            except Exception:
-                pass
-
+        muted, vol = self.audio_service.get_mic_status(self.mic_level)
         self.mic_muted = muted
         if not self._dragging_mic:
             if vol > 0:
@@ -1487,7 +1491,7 @@ class MchoseBatteryApp(ctk.CTk):
     def _poll_loop(self):
         fw_counter = 0
         while not self._stop:
-            ok, bat, sc, eq = self._query_hid()
+            ok, bat, sc, eq = self.hid_service.query_status(self.eq_mode)
             if ok:
                 was_off = not self.connected
                 self.connected = True
@@ -1498,13 +1502,13 @@ class MchoseBatteryApp(ctk.CTk):
                 fw_counter += 1
                 if (was_off and not self.fw_dongle) or fw_counter >= 60:
                     fw_counter = 0
-                    fd, fh = self._get_firmware()
+                    fd, fh = self.hid_service.get_firmware()
                     if fd:
                         self.fw_dongle = fd
                     if fh:
                         self.fw_headset = fh
             else:
-                ok_bt, bat_bt = self._query_bluetooth()
+                ok_bt, bat_bt = self.bluetooth_service.query_bluetooth()
                 if ok_bt:
                     self.connected = True
                     self.connection_mode = "Bluetooth"
@@ -1534,9 +1538,9 @@ def main():
             if app._thread.is_alive() and time.time() < deadline:
                 app.after(50, _wait, deadline)
             else:
-                if app.hid:
+                if app.hid_service.hid:
                     try:
-                        app.hid.hid_exit()
+                        app.hid_service.hid.hid_exit()
                     except Exception:
                         pass
                 try:
