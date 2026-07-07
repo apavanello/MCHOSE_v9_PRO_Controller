@@ -35,14 +35,15 @@ def _make(draw_fn, size=24, color="#e2e4e9"):
     return ctk.CTkImage(light_image=img, dark_image=img, size=(size, size))
 
 
-def icon(draw_fn):
-    cache = {}
+ICON_CACHE = {}
 
+
+def icon(draw_fn):
     def wrapper(size=24, color="#e2e4e9"):
         key = (draw_fn.__name__, size, color)
-        if key not in cache:
-            cache[key] = _make(draw_fn, size, color)
-        return cache[key]
+        if key not in ICON_CACHE:
+            ICON_CACHE[key] = _make(draw_fn, size, color)
+        return ICON_CACHE[key]
 
     return wrapper
 
@@ -833,14 +834,11 @@ class MchoseBatteryApp(ctk.CTk):
         # UI
         self._build_ui()
 
-        # auto-poll thread
+        # Polling scheduling
         self._stop = False
-        self._thread = threading.Thread(target=self._poll_loop, daemon=True)
-        self._thread.start()
-        self._start_audio_poll()
-
-        # initial read
-        self._refresh_system_audio()
+        self._fw_counter = 0
+        self._schedule_poll()
+        self._schedule_audio_poll()
 
     #
     # UI construction
@@ -1304,7 +1302,7 @@ class MchoseBatteryApp(ctk.CTk):
             ok, new_mode = self.hid_service.send_eq_command(mode)
             if ok:
                 self.eq_mode = new_mode
-                self._ui(self._update_eq_buttons)
+                self.run_on_ui(self._update_eq_buttons)
         threading.Thread(target=run, daemon=True).start()
 
     def _update_eq_buttons(self):
@@ -1344,7 +1342,7 @@ class MchoseBatteryApp(ctk.CTk):
             self._eq_hint.configure(text="")
 
     # thread-safe UI helper
-    def _ui(self, fn, *args, **kwargs):
+    def run_on_ui(self, fn, *args, **kwargs):
         self.after(0, lambda: fn(*args, **kwargs))
 
     # card helper
@@ -1465,13 +1463,73 @@ class MchoseBatteryApp(ctk.CTk):
             if vol > 0:
                 self.mic_level = vol
 
-    def _start_audio_poll(self):
+    def _schedule_poll(self):
+        if self._stop:
+            return
+
         def run():
-            while not self._stop:
-                self._refresh_system_audio()
-                self._ui(self._refresh_ui_audio_only)
-                time.sleep(0.3)
+            ok, bat, sc, eq = self.hid_service.query_status(self.eq_mode)
+            fd = fh = None
+            if ok:
+                was_off = not self.connected
+                self._fw_counter += 1
+                if (was_off and not self.fw_dongle) or self._fw_counter >= 60:
+                    self._fw_counter = 0
+                    fd, fh = self.hid_service.get_firmware()
+            else:
+                ok_bt, bat_bt = self.bluetooth_service.query_bluetooth()
+                if ok_bt:
+                    bat = bat_bt
+                    sc = 0x02
+                    eq = self.eq_mode
+                else:
+                    bat = sc = eq = 0
+
+            self.run_on_ui(self._on_poll_done, ok, bat, sc, eq, fd, fh)
+
         threading.Thread(target=run, daemon=True).start()
+
+    def _on_poll_done(self, ok, bat, sc, eq, fd, fh):
+        if self._stop:
+            return
+        if ok:
+            self.connected = True
+            self.connection_mode = "2.4G"
+            self.battery_level = bat
+            self.status_code = sc
+            self.eq_mode = eq
+            if fd:
+                self.fw_dongle = fd
+            if fh:
+                self.fw_headset = fh
+        else:
+            if bat > 0 or sc == 0x02:
+                self.connected = True
+                self.connection_mode = "Bluetooth"
+                self.battery_level = bat
+                self.status_code = sc
+            else:
+                self.connected = False
+                self.connection_mode = None
+
+        self._refresh_ui()
+        self.after(2000, self._schedule_poll)
+
+    def _schedule_audio_poll(self):
+        if self._stop:
+            return
+
+        def run():
+            self._refresh_system_audio()
+            self.run_on_ui(self._on_audio_poll_done)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_audio_poll_done(self):
+        if self._stop:
+            return
+        self._refresh_ui_audio_only()
+        self.after(300, self._schedule_audio_poll)
 
     def _refresh_ui_audio_only(self):
         # volume slider
@@ -1487,45 +1545,6 @@ class MchoseBatteryApp(ctk.CTk):
         # mic
         self._update_mic_visuals()
 
-    # Poll thread
-    def _poll_loop(self):
-        fw_counter = 0
-        while not self._stop:
-            ok, bat, sc, eq = self.hid_service.query_status(self.eq_mode)
-            if ok:
-                was_off = not self.connected
-                self.connected = True
-                self.connection_mode = "2.4G"
-                self.battery_level = bat
-                self.status_code = sc
-                self.eq_mode = eq
-                fw_counter += 1
-                if (was_off and not self.fw_dongle) or fw_counter >= 60:
-                    fw_counter = 0
-                    fd, fh = self.hid_service.get_firmware()
-                    if fd:
-                        self.fw_dongle = fd
-                    if fh:
-                        self.fw_headset = fh
-            else:
-                ok_bt, bat_bt = self.bluetooth_service.query_bluetooth()
-                if ok_bt:
-                    self.connected = True
-                    self.connection_mode = "Bluetooth"
-                    self.battery_level = bat_bt
-                    self.status_code = 0x02
-                else:
-                    self.connected = False
-                    self.connection_mode = None
-
-            self._refresh_system_audio()
-            self._ui(self._refresh_ui)
-
-            for _ in range(20):
-                if self._stop:
-                    break
-                time.sleep(0.1)
-
 
 # Entry point
 def main():
@@ -1533,22 +1552,15 @@ def main():
 
     def on_close():
         app._stop = True
-
-        def _wait(deadline):
-            if app._thread.is_alive() and time.time() < deadline:
-                app.after(50, _wait, deadline)
-            else:
-                if app.hid_service.hid:
-                    try:
-                        app.hid_service.hid.hid_exit()
-                    except Exception:
-                        pass
-                try:
-                    app.destroy()
-                except Exception:
-                    pass
-
-        _wait(time.time() + 1.0)
+        if app.hid_service.hid:
+            try:
+                app.hid_service.hid.hid_exit()
+            except Exception:
+                pass
+        try:
+            app.destroy()
+        except Exception:
+            pass
 
     app.protocol("WM_DELETE_WINDOW", on_close)
     try:
