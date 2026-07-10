@@ -150,13 +150,30 @@ def icon_equalizer(d, s, c):
 # WiFi / Wireless Signal
 @icon
 def icon_wifi(d, s, c):
-    w = _stroke(s)
-    cx, cy = s * 0.50, s * 0.72
-    r = s * 0.06
+    w = _stroke(s, factor=0.08)
+    cx, cy = s * 0.50, s * 0.75
+    r = s * 0.07
     d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-    for rf in [0.20, 0.40, 0.60]:
+    
+    # Pre-calculated trig values for 220 and 320 degrees to draw round caps
+    cos_val = 0.766044
+    sin_val = -0.642788
+    cap_r = w / 2
+    
+    for rf in [0.24, 0.46, 0.68]:
         rad = s * rf
+        # Draw the arc path
         d.arc([cx - rad, cy - rad, cx + rad, cy + rad], 220, 320, fill=c, width=w)
+        
+        # Draw round cap at start of arc
+        x1 = cx - cos_val * rad
+        y1 = cy + sin_val * rad
+        d.ellipse([x1 - cap_r, y1 - cap_r, x1 + cap_r, y1 + cap_r], fill=c)
+        
+        # Draw round cap at end of arc
+        x2 = cx + cos_val * rad
+        y2 = cy + sin_val * rad
+        d.ellipse([x2 - cap_r, y2 - cap_r, x2 + cap_r, y2 + cap_r], fill=c)
 
 
 # Bluetooth
@@ -321,6 +338,13 @@ def icon_cross(d, s, c):
     w = _stroke(s, factor=0.08)
     d.line([(s * 0.28, s * 0.28), (s * 0.72, s * 0.72)], fill=c, width=w)
     d.line([(s * 0.28, s * 0.72), (s * 0.72, s * 0.28)], fill=c, width=w)
+
+
+# Solid Indicator Dot
+@icon
+def icon_dot(d, s, c):
+    r = s * 0.35
+    d.ellipse([s * 0.50 - r, s * 0.50 - r, s * 0.50 + r, s * 0.50 + r], fill=c)
 
 
 # Color Palette
@@ -983,7 +1007,7 @@ class MchoseBatteryApp(ctk.CTk):
         self._conn_text = ctk.CTkLabel(
             info_frame,
             text="Desconectado",
-            font=("Helvetica", 12, "bold"),
+            font=("Helvetica", 13, "bold"),
             text_color=Theme.TEXT_MUTED,
             anchor="w",
         )
@@ -999,15 +1023,14 @@ class MchoseBatteryApp(ctk.CTk):
         self._conn_mode_label.pack(anchor="w")
 
         # Right side: connection indicator dot
-        self._conn_dot = tk.Canvas(
-            conn_row, width=10, height=10, bg=Theme.SURFACE_1, highlightthickness=0
+        self._conn_dot = ctk.CTkLabel(
+            conn_row, text=""
         )
         self._conn_dot.pack(side="right")
         self._draw_dot(Theme.TEXT_DIM)
 
     def _draw_dot(self, color):
-        self._conn_dot.delete("all")
-        self._conn_dot.create_oval(1, 1, 9, 9, fill=color, outline="")
+        self._conn_dot.configure(image=icon_dot(10, color))
 
     # volume card
     def _build_volume_card(self):
@@ -1080,38 +1103,42 @@ class MchoseBatteryApp(ctk.CTk):
         left = ctk.CTkFrame(header, fg_color="transparent")
         left.pack(side="left")
 
-        self._mic_icon_cv = ctk.CTkLabel(
-            left, image=icon_mic(18, Theme.ACCENT_GREEN), text=""
+        self._mic_btn_frame = ctk.CTkFrame(
+            left,
+            width=32,
+            height=32,
+            corner_radius=16,
+            fg_color=Theme.SURFACE_2,
+            border_width=1.5,
+            border_color=Theme.ACCENT_RED if self.mic_muted else Theme.ACCENT_GREEN,
+            cursor="hand2",
         )
-        self._mic_icon_cv.pack(side="left", padx=(0, 8))
+        self._mic_btn_frame.pack_propagate(False)
+        self._mic_btn_frame.pack(side="left", padx=(0, 4))
+
+        self._mic_icon_cv = ctk.CTkLabel(
+            self._mic_btn_frame,
+            image=icon_mic_muted(16, Theme.ACCENT_RED) if self.mic_muted else icon_mic(16, Theme.ACCENT_GREEN),
+            text="",
+            cursor="hand2",
+        )
+        self._mic_icon_cv.pack(expand=True, fill="both")
+
+        for widget in (self._mic_btn_frame, self._mic_icon_cv):
+            widget.bind("<Button-1>", lambda e: self._toggle_mic_mute())
+            widget.bind("<Enter>", lambda e: self._on_mic_hover(True))
+            widget.bind("<Leave>", lambda e: self._on_mic_hover(False))
 
         ctk.CTkLabel(
             left,
             text="Microfone",
             font=("Helvetica", 13, "bold"),
             text_color=Theme.TEXT_PRIMARY,
-        ).pack(side="left")
+        ).pack(side="left", padx=(4, 0))
 
-        # Container for switch and percentage on the right
+        # Container for percentage on the right
         right_frame = ctk.CTkFrame(header, fg_color="transparent")
         right_frame.pack(side="right")
-
-        # Mute switch
-        self._mic_switch = ctk.CTkSwitch(
-            right_frame,
-            text="Mudo",
-            onvalue=1,
-            offvalue=0,
-            command=self._on_mic_switch,
-            font=("Helvetica", 11),
-            button_color=Theme.ACCENT_RED if self.mic_muted else Theme.ACCENT_GREEN,
-            button_hover_color="#fca5a5" if self.mic_muted else "#6ee7b7",
-            progress_color=Theme.ACCENT_RED,
-            text_color=Theme.TEXT_SECONDARY,
-        )
-        self._mic_switch.pack(side="left", padx=(0, 16))
-        if self.mic_muted:
-            self._mic_switch.select()
 
         # Percentage label
         self._mic_pct = ctk.CTkLabel(
@@ -1145,8 +1172,8 @@ class MchoseBatteryApp(ctk.CTk):
             "<ButtonRelease-1>", lambda e: setattr(self, "_dragging_mic", False)
         )
 
-    def _on_mic_switch(self):
-        self.mic_muted = bool(self._mic_switch.get())
+    def _toggle_mic_mute(self):
+        self.mic_muted = not self.mic_muted
         if self.mic_muted:
             if self.mic_level == 0:
                 self.mic_level = 50
@@ -1161,6 +1188,11 @@ class MchoseBatteryApp(ctk.CTk):
         ).start()
         if not self.mic_muted:
             threading.Thread(target=self.audio_service.set_sys_vol, args=(self.mic_level, False), daemon=True).start()
+
+    def _on_mic_hover(self, hovering):
+        self._mic_btn_frame.configure(
+            fg_color=Theme.SURFACE_3 if hovering else Theme.SURFACE_2
+        )
 
     def _on_mic_slide(self, val):
         self._dragging_mic = True
@@ -1186,20 +1218,9 @@ class MchoseBatteryApp(ctk.CTk):
         color = Theme.ACCENT_RED if is_red else Theme.ACCENT_GREEN
         hover = "#fca5a5" if is_red else "#6ee7b7"
 
+        self._mic_btn_frame.configure(border_color=color)
         self._mic_icon_cv.configure(
-            image=icon_mic_muted(18, color) if is_red else icon_mic(18, color)
-        )
-
-        if self.mic_muted:
-            if not self._mic_switch.get():
-                self._mic_switch.select()
-        else:
-            if self._mic_switch.get():
-                self._mic_switch.deselect()
-
-        self._mic_switch.configure(
-            button_color=color,
-            button_hover_color=hover,
+            image=icon_mic_muted(16, color) if is_red else icon_mic(16, color)
         )
 
         self._mic_pct.configure(
