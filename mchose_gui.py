@@ -475,64 +475,99 @@ class BatteryRing(tk.Canvas):
         r = (s - 2 * pad) // 2
         w = max(6, int(r * 0.14))
 
-        # Glow effect (subtle shadow behind the arc)
-        glow_r = r + 4
-        if self._anim_pct > 0:
-            try:
-                glow_img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+        # High-quality anti-aliased PIL rendering
+        try:
+            from PIL import Image, ImageDraw, ImageFilter, ImageTk
+            import math
+
+            scale = 4
+            px = s * scale
+            ring_img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+            d_img = ImageDraw.Draw(ring_img)
+            
+            cx_p = cy_p = px / 2
+            pad_p = pad * scale
+            r_p = (px - 2 * pad_p) // 2
+            w_p = max(6 * scale, int(r_p * 0.14))
+            r_center = r_p - w_p / 2
+
+            # Glow effect (behind the active arc)
+            if self._anim_pct > 0:
+                glow_r = r_p
+                glow_img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
                 gd = ImageDraw.Draw(glow_img)
+                
+                # Convert hex color to rgb
+                c_hex = self._color.lstrip("#")
+                rgb = tuple(int(c_hex[i:i+2], 16) for i in (0, 2, 4))
+                
+                start_angle = 270
+                end_angle = 270 + (self._anim_pct * 3.6)
+                
+                gd.arc([cx_p - glow_r, cy_p - glow_r, cx_p + glow_r, cy_p + glow_r], 
+                       start_angle, end_angle, fill=(*rgb, 40), width=w_p + 8 * scale)
+                       
+                # Draw round caps for glow
+                cap_r_glow = (w_p + 8 * scale) / 2
+                gd.ellipse([cx_p - cap_r_glow, cy_p - r_center - cap_r_glow, cx_p + cap_r_glow, cy_p - r_center + cap_r_glow], fill=(*rgb, 40))
+                
+                theta_rad = math.radians(end_angle)
+                x_end = cx_p + math.cos(theta_rad) * r_center
+                y_end = cy_p + math.sin(theta_rad) * r_center
+                gd.ellipse([x_end - cap_r_glow, y_end - cap_r_glow, x_end + cap_r_glow, y_end + cap_r_glow], fill=(*rgb, 40))
+                
+                # Apply blur to glow
+                glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=6 * scale))
+                ring_img = Image.alpha_composite(ring_img, glow_img)
+                d_img = ImageDraw.Draw(ring_img)
+
+            # Track (background ring)
+            d_img.ellipse([cx_p - r_p, cy_p - r_p, cx_p + r_p, cy_p + r_p], outline=Theme.BORDER, width=w_p)
+
+            # Active colored arc with round caps
+            if self._anim_pct > 0:
+                start_angle = 270
+                end_angle = 270 + (self._anim_pct * 3.6)
+                d_img.arc([cx_p - r_p, cy_p - r_p, cx_p + r_p, cy_p + r_p], start_angle, end_angle, fill=self._color, width=w_p)
+                
+                cap_r = w_p / 2
+                # Start cap (at 12 o'clock)
+                d_img.ellipse([cx_p - cap_r, cy_p - r_center - cap_r, cx_p + cap_r, cy_p - r_center + cap_r], fill=self._color)
+                
+                # End cap
+                theta_rad = math.radians(end_angle)
+                x_end = cx_p + math.cos(theta_rad) * r_center
+                y_end = cy_p + math.sin(theta_rad) * r_center
+                d_img.ellipse([x_end - cap_r, y_end - cap_r, x_end + cap_r, y_end + cap_r], fill=self._color)
+
+            # Center background circle
+            inner_r = r_p - w_p - 8 * scale
+            if inner_r > 0:
+                d_img.ellipse([cx_p - inner_r, cy_p - inner_r, cx_p + inner_r, cy_p + inner_r], fill="#0d1017")
+
+            # Downscale using LANCZOS for high-quality anti-aliasing
+            resized_img = ring_img.resize((s, s), Image.LANCZOS)
+            self._bg_photo = ImageTk.PhotoImage(resized_img)
+            self.create_image(0, 0, anchor="nw", image=self._bg_photo)
+
+        except Exception as e:
+            # Fallback to standard Tkinter drawing if PIL fails
+            print("Fallback drawing battery ring:", e)
+            self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=Theme.BORDER, width=w)
+            if self._anim_pct > 0:
                 extent = -self._anim_pct * 3.6
                 if extent <= -360:
                     extent = -359.99
-                rgb = _hex_to_rgb(self._color)
-                gd.arc(
-                    [cx - glow_r, cy - glow_r, cx + glow_r, cy + glow_r],
-                    start=270,
-                    end=270 + (self._anim_pct * 3.6),
-                    fill=(*rgb, 40),
-                    width=w + 8,
+                self.create_arc(
+                    cx - r, cy - r, cx + r, cy + r,
+                    start=90, extent=extent, outline=self._color, width=w, style="arc"
                 )
-                glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=6))
-                self._glow_photo = ctk.CTkImage(
-                    light_image=glow_img, dark_image=glow_img, size=(s, s)
+            inner_r_fallback = r - w - 8
+            if inner_r_fallback > 0:
+                self.create_oval(
+                    cx - inner_r_fallback, cy - inner_r_fallback, cx + inner_r_fallback, cy + inner_r_fallback,
+                    fill="#0d1017", outline=""
                 )
-                self.create_image(0, 0, anchor="nw", image=self._glow_photo)
-            except Exception:
-                pass
-
-        # Track (background ring)
-        self.create_oval(cx - r, cy - r, cx + r, cy + r, outline=Theme.BORDER, width=w)
-
-        # Gradient arc
-        if self._anim_pct > 0:
-            extent = -self._anim_pct * 3.6
-            if extent <= -360:
-                extent = -359.99
-            # Draw the main arc
-            self.create_arc(
-                cx - r,
-                cy - r,
-                cx + r,
-                cy + r,
-                start=90,
-                extent=extent,
-                outline=self._color,
-                width=w,
-                style="arc",
-            )
-
-        # Center content
-        # Subtle background circle
-        inner_r = r - w - 8
-        if inner_r > 0:
-            self.create_oval(
-                cx - inner_r,
-                cy - inner_r,
-                cx + inner_r,
-                cy + inner_r,
-                fill="#0d1017",
-                outline="",
-            )
 
         # Percentage text
         font_size = max(22, int(r * 0.48))
