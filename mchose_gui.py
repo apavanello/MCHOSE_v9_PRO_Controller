@@ -349,6 +349,7 @@ def icon_dot(d, s, c):
 
 # Color Palette
 class Theme:
+    FONT_FAMILY = "Sans"  
     BG = "#0b0e14"  # Deep rich dark (main background)
     SURFACE_1 = "#131720"  # Card surface (primary)
     SURFACE_2 = "#1a1f2b"  # Card surface (elevated/hover)
@@ -576,7 +577,7 @@ class BatteryRing(tk.Canvas):
             cy - 4,
             text=f"{int(self._anim_pct)}%",
             fill=Theme.TEXT_PRIMARY,
-            font=("Helvetica", font_size, "bold"),
+            font=(Theme.FONT_FAMILY, font_size, "bold"),
         )
 
         # "BATERIA" label below
@@ -586,7 +587,7 @@ class BatteryRing(tk.Canvas):
             cy + font_size * 0.55,
             text="BATERIA",
             fill=Theme.TEXT_MUTED,
-            font=("Helvetica", label_size, "normal"),
+            font=(Theme.FONT_FAMILY, label_size, "normal"),
         )
 
 
@@ -969,7 +970,7 @@ class MchoseBatteryApp(ctk.CTk):
         ctk.CTkLabel(
             frame,
             text="MCHOSE",
-            font=("Helvetica", 14, "bold"),
+            font=(Theme.FONT_FAMILY, 14, "bold"),
             text_color=Theme.TEXT_MUTED,
             anchor="w",
         ).grid(row=1, column=0, sticky="w")
@@ -977,7 +978,7 @@ class MchoseBatteryApp(ctk.CTk):
         ctk.CTkLabel(
             frame,
             text="V9 PRO CONTROLLER",
-            font=("Helvetica", 26, "bold"),
+            font=(Theme.FONT_FAMILY, 26, "bold"),
             text_color=Theme.TEXT_PRIMARY,
             anchor="w",
         ).grid(row=2, column=0, sticky="w", pady=(0, 4))
@@ -986,7 +987,7 @@ class MchoseBatteryApp(ctk.CTk):
         self._fw_label = ctk.CTkLabel(
             frame,
             text="",
-            font=("Helvetica", 11),
+            font=(Theme.FONT_FAMILY, 11),
             text_color=Theme.TEXT_MUTED,
             anchor="w",
         )
@@ -1015,7 +1016,7 @@ class MchoseBatteryApp(ctk.CTk):
         self._status_label = ctk.CTkLabel(
             self._status_frame,
             text="Fone não detectado",
-            font=("Helvetica", 11, "bold"),
+            font=(Theme.FONT_FAMILY, 11, "bold"),
             text_color=Theme.ACCENT_RED,
         )
         self._status_label.pack(side="left", padx=(0, 12))
@@ -1042,7 +1043,7 @@ class MchoseBatteryApp(ctk.CTk):
         self._conn_text = ctk.CTkLabel(
             info_frame,
             text="Desconectado",
-            font=("Helvetica", 13, "bold"),
+            font=(Theme.FONT_FAMILY, 13, "bold"),
             text_color=Theme.TEXT_MUTED,
             anchor="w",
         )
@@ -1051,7 +1052,7 @@ class MchoseBatteryApp(ctk.CTk):
         self._conn_mode_label = ctk.CTkLabel(
             info_frame,
             text="Aguardando conexão...",
-            font=("Helvetica", 10),
+            font=(Theme.FONT_FAMILY, 10),
             text_color=Theme.TEXT_DIM,
             anchor="w",
         )
@@ -1084,14 +1085,14 @@ class MchoseBatteryApp(ctk.CTk):
         ctk.CTkLabel(
             left,
             text="Volume",
-            font=("Helvetica", 13, "bold"),
+            font=(Theme.FONT_FAMILY, 13, "bold"),
             text_color=Theme.TEXT_PRIMARY,
         ).pack(side="left")
 
         self._vol_pct = ctk.CTkLabel(
             header,
             text="50%",
-            font=("Helvetica", 14, "bold"),
+            font=(Theme.FONT_FAMILY, 14, "bold"),
             text_color=Theme.ACCENT_BLUE,
         )
         self._vol_pct.pack(side="right")
@@ -1167,7 +1168,7 @@ class MchoseBatteryApp(ctk.CTk):
         ctk.CTkLabel(
             left,
             text="Microfone",
-            font=("Helvetica", 13, "bold"),
+            font=(Theme.FONT_FAMILY, 13, "bold"),
             text_color=Theme.TEXT_PRIMARY,
         ).pack(side="left", padx=(4, 0))
 
@@ -1181,7 +1182,7 @@ class MchoseBatteryApp(ctk.CTk):
             text="50%",
             width=45,
             anchor="e",
-            font=("Helvetica", 14, "bold"),
+            font=(Theme.FONT_FAMILY, 14, "bold"),
             text_color=Theme.ACCENT_RED if self.mic_muted else Theme.ACCENT_GREEN,
         )
         self._mic_pct.pack(side="left")
@@ -1339,14 +1340,14 @@ class MchoseBatteryApp(ctk.CTk):
         ctk.CTkLabel(
             left,
             text="Equalizador",
-            font=("Helvetica", 13, "bold"),
+            font=(Theme.FONT_FAMILY, 13, "bold"),
             text_color=Theme.ACCENT_GOLD,
         ).pack(side="left")
 
         self._eq_hint = ctk.CTkLabel(
             top,
             text="",
-            font=("Helvetica", 10),
+            font=(Theme.FONT_FAMILY, 10),
             text_color=Theme.TEXT_MUTED,
         )
         self._eq_hint.pack(side="right")
@@ -1369,7 +1370,7 @@ class MchoseBatteryApp(ctk.CTk):
                 eq_frame,
                 text=txt,
                 corner_radius=12,
-                font=("Helvetica", 12, "bold"),
+                font=(Theme.FONT_FAMILY, 12, "bold"),
                 height=40,
                 fg_color=Theme.SURFACE_2,
                 hover_color=Theme.SURFACE_3,
