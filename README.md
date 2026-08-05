@@ -79,3 +79,30 @@ Navegue até o diretório do projeto e inicie a interface:
 ```bash
 python3 mchose_qt.py
 ```
+
+### Criar Atalho no Menu de Aplicativos (Ubuntu / GNOME / Linux Desktop)
+
+Para adicionar o aplicativo ao menu do sistema de forma genérica (independente de usuário ou caminho da pasta):
+
+```bash
+# 1. Torne o script executável
+chmod +x mchose_qt.py
+
+# 2. Crie o atalho .desktop registrando o caminho do diretório atual
+cat <<EOF > ~/.local/share/applications/mchose-v9-pro.desktop
+[Desktop Entry]
+Type=Application
+Name=MCHOSE V9 PRO
+Comment=Status de bateria e controle do headset MCHOSE V9 PRO
+Exec=python3 $(pwd)/mchose_qt.py
+Icon=$(pwd)/icon.png
+Path=$(pwd)
+Terminal=false
+Categories=Utility;Settings;AudioVideo;
+Keywords=headset;mchose;battery;bateria;fone;
+StartupWMClass=mchose_qt
+EOF
+
+# 3. Atualize o banco de dados de atalhos
+update-desktop-database ~/.local/share/applications
+```
