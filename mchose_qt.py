@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
     QSlider,
     QPushButton,
     QFrame,
+    QGraphicsOpacityEffect,
 )
 
 # Enable Ctrl+C to terminate application cleanly
@@ -736,6 +737,11 @@ class EqualizerIconWidget(QWidget):
         self.setFixedSize(34, 34)
         self.color = color
 
+    def set_color(self, color):
+        if self.color != color:
+            self.color = color
+            self.update()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1093,6 +1099,9 @@ class MChoseMainWindow(QMainWindow):
         # Equalizer Card
         eq_card = QFrame()
         eq_card.setObjectName("Card")
+        self.eq_opacity = QGraphicsOpacityEffect(eq_card)
+        eq_card.setGraphicsEffect(self.eq_opacity)
+
         eq_layout = QVBoxLayout(eq_card)
         eq_layout.setContentsMargins(12, 8, 12, 10)
         eq_layout.setSpacing(6)
@@ -1107,10 +1116,16 @@ class MChoseMainWindow(QMainWindow):
             "color: #fbbf24; font-weight: bold; font-size: 14px;"
         )
 
+        self.lbl_eq_hint = QLabel("")
+        self.lbl_eq_hint.setStyleSheet(
+            "color: #94a3b8; font-size: 11px; font-weight: bold;"
+        )
+
         eq_left.addWidget(eq_icon_widget)
         eq_left.addWidget(lbl_eq_title)
         eq_header.addLayout(eq_left)
         eq_header.addStretch()
+        eq_header.addWidget(self.lbl_eq_hint)
         eq_layout.addLayout(eq_header)
 
         eq_btn_layout = QHBoxLayout()
@@ -1290,7 +1305,16 @@ class MChoseMainWindow(QMainWindow):
         else:
             self.lbl_conn.setText("Desconectado")
 
+        eq_enabled = (self.connected and self.connection_mode == "2.4G")
+        self.eq_opacity.setOpacity(1.0 if eq_enabled else 0.45)
+
+        if not eq_enabled and self.connected and self.connection_mode == "Bluetooth":
+            self.lbl_eq_hint.setText("somente 2.4G")
+        else:
+            self.lbl_eq_hint.setText("")
+
         for i, btn in enumerate(self.eq_buttons):
+            btn.setEnabled(eq_enabled)
             is_active = i == self.eq_mode
             btn.setChecked(is_active)
             icon_color = QColor("#0b0e14") if is_active else Theme.TEXT_SECONDARY
@@ -1396,6 +1420,9 @@ class MChoseMainWindow(QMainWindow):
             self.audio_service.set_sys_vol(self.mic_level, sink=False)
 
     def _set_eq(self, mode):
+        if not (self.connected and self.connection_mode == "2.4G"):
+            return
+
         self.eq_mode = mode
         self.poll_worker.eq_mode = mode
         self._update_ui_state()
