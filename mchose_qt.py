@@ -1883,6 +1883,7 @@ class MChoseMainWindow(QMainWindow):
         def _async():
             vol = self.hid_service.get_prompt_volume()
             minutes = self.hid_service.get_auto_shutdown()
+            names = [self.hid_service.get_eq_mode_desc(m) or "" for m in range(3)]
             self._loading_settings = True
             if vol is not None:
                 self.prompt_slider.setValue(max(1, min(16, int(vol))))
@@ -1893,6 +1894,10 @@ class MChoseMainWindow(QMainWindow):
                     idx = 0
                 if idx >= 0:
                     self.autooff_combo.setCurrentIndex(idx)
+            for btn, nome in zip(self.eq_buttons, names):
+                if nome:
+                    btn.setText(nome if len(nome) <= 12 else nome[:11] + "…")
+                    btn.setToolTip(nome)
             self._loading_settings = False
 
         threading.Thread(target=_async, daemon=True).start()
