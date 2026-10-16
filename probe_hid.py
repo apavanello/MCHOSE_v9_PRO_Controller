@@ -87,7 +87,7 @@ def main():
             "Sem permissao no /dev/hidraw*? Aplique a regra udev do README."
         )
 
-    def read(label, timeout_ms=700):
+    def read(label, timeout_ms=1200):
         rbuf = bytearray(64)
         cr = (ctypes.c_char * 64).from_buffer(rbuf)
         n = hid.hid_read_timeout(handle, cr, 64, timeout_ms)
@@ -105,8 +105,9 @@ def main():
         print(f"-> [{label}] {len(payload)} bytes: {hexs(buf)} (hid_write={n})")
         return read(label, timeout_ms) if expect else None
 
-    print("\n=== 1. Escuta passiva (3 s) — notificacoes espontaneas ===")
-    deadline = time.monotonic() + 3.0
+    print("\n=== 1. Escuta passiva (8 s) — notificacoes espontaneas ===")
+    print("  (dica: aperte botoes do headset / gire o volume nele agora)")
+    deadline = time.monotonic() + 8.0
     while time.monotonic() < deadline:
         rbuf = bytearray(64)
         cr = (ctypes.c_char * 64).from_buffer(rbuf)
