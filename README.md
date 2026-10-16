@@ -18,12 +18,31 @@ O **MCHOSE V9 PRO Controller (`mchose_qt.py`)** é uma aplicação desktop nativ
 ```
 [0]=0xAA  [1]=0x01  [2]=flags  [3]=len  [4:6]=tipo  [6]=cmd  [7:]=payload  [..]=xor
 tipo: 00 01 (request/response) · 00 02 (set) · 00 04 (notify) · 00 06 (OTA)
-cmd:  01 set EQ · 0B bateria · 0C EQ atual · 04 estado PEQ · 50 OTA query
 bateria (payload de resposta): [acordado, status] — status&0x7F = %, bit7 = carregando
 modos de EQ: 0=Jogo 1 · 1=Jogo 2 · 2=Jogo 3
 ```
 
-Protocolo documentado por engenharia reversa do código do hub oficial (renderer WebHID em `cdn.mchose.com.cn`) — sem USB sniffing necessário.
+Comandos mapeados (todos documentados por engenharia reversa do código do hub oficial — renderer WebHID em `cdn.mchose.com.cn`):
+
+| Cmd | Função | No app |
+|---|---|---|
+| 0x01 / 0x0C | trocar / ler modo de EQ | ✅ |
+| 0x0B | bateria (% · carregando · dormindo) | ✅ |
+| 0x04 | ler estado do EQ paramétrico (ganho total, pontos, fc/Q/tipo/enable) | ✅ (ganhos) |
+| 0x05 / 0x18 | ler / renomear modos (até 54 bytes UTF-8) | ✅ |
+| 0x0D / 0x21 | ler / ajustar volume do anúncio de voz (1–16) | ✅ |
+| 0x0E / 0x1A | ler / ajustar auto-desligamento (minutos; 0 = nunca) | ✅ |
+| 0x12 | gravar ganhos de todas as bandas do modo (±12 dB, passo 0,5) | ✅ |
+| 0x19 | restaurar curva de EQ padrão do modo | ✅ |
+| 0x27 | factory reset | ❌ deliberadamente não exposto |
+| 0x80+ (tipo 00 06) | OTA de firmware | ❌ idem (risco de brick) |
+
+### Testes
+
+```bash
+PYTHONPATH=. python3 tests/test_protocol.py   # offline: frames e parsers
+python3 probe_hid.py                           # contra o dongle (somente leitura)
+```
 
 ## Stack Técnica
 

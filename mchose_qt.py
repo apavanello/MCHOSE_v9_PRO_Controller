@@ -39,6 +39,11 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QFrame,
     QGraphicsOpacityEffect,
+    QComboBox,
+    QDoubleSpinBox,
+    QInputDialog,
+    QMessageBox,
+    QGridLayout,
 )
 
 # Enable Ctrl+C to terminate application cleanly
@@ -66,9 +71,22 @@ NEW_SET = (0x00, 0x02)
 NEW_NOTIFY = (0x00, 0x04)
 NEW_OTA = (0x00, 0x06)
 NEW_CMD_SET_EQ = 0x01
+NEW_CMD_GET_EQ_STATE = 0x04
+NEW_CMD_GET_EQ_DESC = 0x05
 NEW_CMD_GET_BATTERY = 0x0B
 NEW_CMD_GET_EQ = 0x0C
+NEW_CMD_GET_PROMPT_VOL = 0x0D
+NEW_CMD_GET_AUTO_OFF = 0x0E
+NEW_CMD_SET_PEQ_ALL = 0x10
+NEW_CMD_SET_PEQ_GAINS = 0x12
+NEW_CMD_SET_EQ_NAME = 0x18
+NEW_CMD_RESTORE_EQ = 0x19
+NEW_CMD_SET_AUTO_OFF = 0x1A
+NEW_CMD_SET_PROMPT_VOL = 0x21
 NEW_OTA_QUERY = 0x80
+# seletores do estado do PEQ (payload de GET_EQ_STATE: [modo, seletor])
+NEW_PEQ_ALL_POINTS = 0xFF
+NEW_PEQ_ALL_GAIN = 0xFD
 
 
 # Theme colors
@@ -240,6 +258,132 @@ class HIDService:
             else:
                 versions.append("")
         return versions[1], versions[0]  # dongle, headset
+
+    def _send_new(self, handle, cmd_type, cmd, payload=b""):
+        # envio sem esperar ack (comandos Set que o hub manda como sendReportOnce)
+        buf = bytearray(64)
+        buf[0] = 0x55
+        buf[1:] = self._build_frame(cmd_type, cmd, payload)
+        c = (ctypes.c_char * 64).from_buffer(buf)
+        return self.hid.hid_write(handle, c, 64) > 0
+
+    def _with_new_device(self, fn):
+        if not self.hid or self.protocol != "new":
+            return None
+        with self._lock:
+            handle = self._open_device()
+            if not handle:
+                return None
+            try:
+                return fn(handle)
+            finally:
+                self.hid.hid_close(handle)
+
+    def get_prompt_volume(self):
+        # faixa valida: 1..16
+        def run(h):
+            pay = self._xchg_new(h, NEW_REQUEST, NEW_CMD_GET_PROMPT_VOL)
+            return pay[0] if pay else None
+
+        return self._with_new_device(run)
+
+    def set_prompt_volume(self, volume):
+        vol = max(1, min(16, int(volume)))
+
+        def run(h):
+            return self._send_new(h, NEW_SET, NEW_CMD_SET_PROMPT_VOL, bytes([vol]))
+
+        return bool(self._with_new_device(run))
+
+    def get_auto_shutdown(self):
+        # minutos (0 = nunca)
+        def run(h):
+            pay = self._xchg_new(h, NEW_REQUEST, NEW_CMD_GET_AUTO_OFF)
+            if not pay or len(pay) < 2:
+                return None
+            return (pay[0] << 8) | pay[1]
+
+        return self._with_new_device(run)
+
+    def set_auto_shutdown(self, minutes):
+        minutes = max(0, min(0xFFFF, int(minutes)))
+
+        def run(h):
+            return self._send_new(
+                h,
+                NEW_SET,
+                NEW_CMD_SET_AUTO_OFF,
+                bytes([(minutes >> 8) & 0xFF, minutes & 0xFF]),
+            )
+
+        return bool(self._with_new_device(run))
+
+    def get_eq_mode_desc(self, mode):
+        def run(h):
+            pay = self._xchg_new(h, NEW_REQUEST, NEW_CMD_GET_EQ_DESC, bytes([mode]))
+            if not pay or len(pay) < 1:
+                return None
+            raw = bytes(pay[1:])
+            return raw.split(b"\x00")[0].decode("utf-8", errors="replace").strip()
+
+        return self._with_new_device(run)
+
+    def set_eq_mode_name(self, mode, name):
+        encoded = name.encode("utf-8")[:54]
+        while encoded:
+            try:
+                encoded.decode("utf-8")
+                break
+            except UnicodeDecodeError:
+                encoded = encoded[:-1]
+        if not encoded:
+            return False
+        payload = bytes([mode]) + encoded
+
+        def run(h):
+            return self._send_new(h, NEW_SET, NEW_CMD_SET_EQ_NAME, payload)
+
+        return bool(self._with_new_device(run))
+
+    def restore_eq_default(self, mode):
+        def run(h):
+            return self._send_new(h, NEW_SET, NEW_CMD_RESTORE_EQ, bytes([mode]))
+
+        return bool(self._with_new_device(run))
+
+    def get_peq_gains(self, mode):
+        # ganhos (dB, x10 int16) de todos os pontos do modo — cabe em 1 pacote
+        def run(h):
+            pay = self._xchg_new(
+                h, NEW_REQUEST, NEW_CMD_GET_EQ_STATE, bytes([mode, NEW_PEQ_ALL_GAIN])
+            )
+            if not pay or len(pay) < 2:
+                return None
+            count = pay[1]
+            offset = 4 if len(pay) >= 4 + count * 2 else 3
+            gains = []
+            for i in range(count):
+                p = offset + i * 2
+                if p + 1 >= len(pay):
+                    break
+                raw = (pay[p] << 8) | pay[p + 1]
+                if raw >= 0x8000:
+                    raw -= 0x10000
+                gains.append(raw / 10.0)
+            return gains
+
+        return self._with_new_device(run)
+
+    def set_peq_gains(self, mode, gains):
+        payload = bytearray([mode, len(gains)])
+        for g in gains:
+            v = int(round(max(-12.0, min(12.0, float(g))) * 10))
+            payload += bytes([(v >> 8) & 0xFF, v & 0xFF])
+
+        def run(h):
+            return self._send_new(h, NEW_SET, NEW_CMD_SET_PEQ_GAINS, bytes(payload))
+
+        return bool(self._with_new_device(run))
 
     # ---------- protocolo "antigo" (V9 PRO original) ----------
 
@@ -1073,6 +1217,8 @@ class MChoseMainWindow(QMainWindow):
         self._ignore_mic_slider_event = False
         self._ignore_vol_slider_event = False
         self._eq_labels_applied = None
+        self._loading_settings = False
+        self._settings_loaded = False
 
         self._init_ui()
         self._apply_stylesheet()
@@ -1281,7 +1427,126 @@ class MChoseMainWindow(QMainWindow):
             self.eq_buttons.append(btn)
 
         eq_layout.addLayout(eq_btn_layout)
+
+        eq_extra_layout = QHBoxLayout()
+        self.btn_eq_rename = QPushButton("Renomear modo")
+        self.btn_eq_rename.clicked.connect(self._rename_eq_mode)
+        self.btn_eq_rename.setCursor(Qt.CursorShape.PointingHandCursor)
+        eq_extra_layout.addWidget(self.btn_eq_rename)
+        self.btn_eq_restore = QPushButton("Restaurar EQ padrão")
+        self.btn_eq_restore.clicked.connect(self._restore_eq_default)
+        self.btn_eq_restore.setCursor(Qt.CursorShape.PointingHandCursor)
+        eq_extra_layout.addWidget(self.btn_eq_restore)
+        eq_layout.addLayout(eq_extra_layout)
         layout.addWidget(eq_card)
+
+        # Device Settings Card (V9 Pro 2)
+        self.settings_card = QFrame()
+        self.settings_card.setObjectName("Card")
+        settings_layout = QVBoxLayout(self.settings_card)
+        settings_layout.setContentsMargins(12, 8, 12, 10)
+        settings_layout.setSpacing(6)
+
+        set_header = QHBoxLayout()
+        set_left = QHBoxLayout()
+        set_left.setSpacing(10)
+        lbl_set_title = QLabel("Ajustes do headset")
+        lbl_set_title.setStyleSheet(
+            "color: #818cf8; font-weight: bold; font-size: 14px;"
+        )
+        set_left.addWidget(lbl_set_title)
+        set_header.addLayout(set_left)
+        set_header.addStretch()
+        settings_layout.addLayout(set_header)
+
+        prompt_row = QHBoxLayout()
+        lbl_prompt = QLabel("Volume do anúncio")
+        lbl_prompt.setStyleSheet("color: #f1f5f9; font-size: 13px;")
+        self.prompt_slider = QSlider(Qt.Orientation.Horizontal)
+        self.prompt_slider.setRange(1, 16)
+        self.prompt_slider.setValue(1)
+        self.lbl_prompt_val = QLabel("1")
+        self.lbl_prompt_val.setStyleSheet(
+            "color: #818cf8; font-weight: bold; font-size: 13px;"
+        )
+        prompt_row.addWidget(lbl_prompt)
+        prompt_row.addWidget(self.prompt_slider, stretch=1)
+        prompt_row.addWidget(self.lbl_prompt_val)
+        settings_layout.addLayout(prompt_row)
+
+        autooff_row = QHBoxLayout()
+        lbl_autooff = QLabel("Auto-desligamento")
+        lbl_autooff.setStyleSheet("color: #f1f5f9; font-size: 13px;")
+        self.autooff_combo = QComboBox()
+        for label, minutes in (
+            ("Nunca", 0),
+            ("5 min", 5),
+            ("10 min", 10),
+            ("15 min", 15),
+            ("30 min", 30),
+            ("60 min", 60),
+        ):
+            self.autooff_combo.addItem(label, minutes)
+        autooff_row.addWidget(lbl_autooff)
+        autooff_row.addWidget(self.autooff_combo, stretch=1)
+        settings_layout.addLayout(autooff_row)
+        layout.addWidget(self.settings_card)
+
+        # Parametric EQ Gains Card (V9 Pro 2)
+        self.peq_card = QFrame()
+        self.peq_card.setObjectName("Card")
+        peq_layout = QVBoxLayout(self.peq_card)
+        peq_layout.setContentsMargins(12, 8, 12, 10)
+        peq_layout.setSpacing(6)
+
+        peq_header = QHBoxLayout()
+        lbl_peq_title = QLabel("Ganhos EQ (avançado)")
+        lbl_peq_title.setStyleSheet(
+            "color: #34d399; font-weight: bold; font-size: 14px;"
+        )
+        peq_header.addWidget(lbl_peq_title)
+        peq_header.addStretch()
+        self.lbl_peq_mode = QLabel("")
+        self.lbl_peq_mode.setStyleSheet(
+            "color: #94a3b8; font-size: 11px; font-weight: bold;"
+        )
+        peq_header.addWidget(self.lbl_peq_mode)
+        peq_layout.addLayout(peq_header)
+
+        gains_grid = QGridLayout()
+        gains_grid.setSpacing(4)
+        self.peq_spins = []
+        for i in range(10):
+            spin = QDoubleSpinBox()
+            spin.setRange(-12.0, 12.0)
+            spin.setSingleStep(0.5)
+            spin.setDecimals(1)
+            spin.setValue(0.0)
+            spin.setPrefix(f"{i + 1}: ")
+            spin.setFixedWidth(88)
+            spin.setToolTip(f"Ganho da banda {i + 1} do modo atual (dB)")
+            gains_grid.addWidget(spin, i // 5, i % 5)
+            self.peq_spins.append(spin)
+        peq_layout.addLayout(gains_grid)
+
+        peq_btn_row = QHBoxLayout()
+        self.btn_peq_read = QPushButton("Ler do headset")
+        self.btn_peq_read.clicked.connect(self._read_peq_gains)
+        self.btn_peq_apply = QPushButton("Aplicar ganhos")
+        self.btn_peq_apply.setStyleSheet(
+            "QPushButton { color: #34d399; } QPushButton:hover { color: #6ee7b7; }"
+        )
+        self.btn_peq_apply.clicked.connect(self._apply_peq_gains)
+        peq_btn_row.addWidget(self.btn_peq_read)
+        peq_btn_row.addWidget(self.btn_peq_apply)
+        peq_layout.addLayout(peq_btn_row)
+        layout.addWidget(self.peq_card)
+
+        self.prompt_slider.sliderReleased.connect(self._on_prompt_slider_released)
+        self.prompt_slider.valueChanged.connect(
+            lambda v: self.lbl_prompt_val.setText(str(v))
+        )
+        self.autooff_combo.currentIndexChanged.connect(self._on_autooff_changed)
 
     def _apply_stylesheet(self):
         self.setStyleSheet(
@@ -1396,6 +1661,7 @@ class MChoseMainWindow(QMainWindow):
             else:
                 self.connected = False
                 self.connection_mode = None
+                self._settings_loaded = False
 
         if self.fw_dongle and self.fw_headset:
             self.lbl_fw.setText(
@@ -1473,6 +1739,31 @@ class MChoseMainWindow(QMainWindow):
             btn.setChecked(is_active)
             icon_color = QColor("#0b0e14") if is_active else Theme.TEXT_SECONDARY
             btn.setIcon(self._eq_icon_fns[i](icon_color))
+
+        is_new = self.hid_service.protocol == "new"
+        self.btn_eq_rename.setVisible(is_new)
+        self.btn_eq_restore.setVisible(is_new)
+        self.settings_card.setVisible(is_new)
+        self.peq_card.setVisible(is_new)
+        if is_new:
+            settings_ok = eq_enabled
+            widgets = (
+                self.btn_eq_rename,
+                self.btn_eq_restore,
+                self.prompt_slider,
+                self.autooff_combo,
+                self.btn_peq_read,
+                self.btn_peq_apply,
+                *self.peq_spins,
+            )
+            for w in widgets:
+                w.setEnabled(settings_ok)
+            self.lbl_peq_mode.setText(
+                f"modo {self.eq_mode + 1}" if self.connected else ""
+            )
+            if settings_ok and not self._settings_loaded:
+                self._settings_loaded = True
+                self._load_device_settings()
 
         self._update_vol_visuals()
         self._update_mic_visuals()
@@ -1587,6 +1878,99 @@ class MChoseMainWindow(QMainWindow):
                 self.poll_worker.eq_mode = new_mode
 
         threading.Thread(target=_async_send, daemon=True).start()
+
+    def _load_device_settings(self):
+        def _async():
+            vol = self.hid_service.get_prompt_volume()
+            minutes = self.hid_service.get_auto_shutdown()
+            self._loading_settings = True
+            if vol is not None:
+                self.prompt_slider.setValue(max(1, min(16, int(vol))))
+            if minutes is not None:
+                idx = self.autooff_combo.findData(minutes)
+                if idx < 0 and minutes > 0:
+                    self.autooff_combo.insertItem(0, f"{minutes} min", minutes)
+                    idx = 0
+                if idx >= 0:
+                    self.autooff_combo.setCurrentIndex(idx)
+            self._loading_settings = False
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _on_prompt_slider_released(self):
+        if self._loading_settings:
+            return
+        value = self.prompt_slider.value()
+
+        def _async():
+            self.hid_service.set_prompt_volume(value)
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _on_autooff_changed(self, index):
+        if self._loading_settings or index < 0:
+            return
+        minutes = self.autooff_combo.itemData(index)
+
+        def _async():
+            self.hid_service.set_auto_shutdown(minutes)
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _rename_eq_mode(self):
+        mode = self.eq_mode
+        current = self.hid_service.get_eq_mode_desc(mode) or ""
+        name, ok = QInputDialog.getText(
+            self,
+            "Renomear modo de EQ",
+            f"Novo nome para o modo {mode + 1} (até 54 caracteres):",
+            text=current,
+        )
+        if not ok or not name.strip():
+            return
+        name = name.strip()[:54]
+
+        def _async():
+            self.hid_service.set_eq_mode_name(mode, name)
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _restore_eq_default(self):
+        mode = self.eq_mode
+        answer = QMessageBox.question(
+            self,
+            "Restaurar EQ padrão",
+            f"Restaurar a curva de equalização padrão do modo {mode + 1}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        def _async():
+            if self.hid_service.restore_eq_default(mode):
+                self._read_peq_gains()
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _read_peq_gains(self):
+        mode = self.eq_mode
+
+        def _async():
+            gains = self.hid_service.get_peq_gains(mode)
+            if gains:
+                for spin, g in zip(self.peq_spins, gains):
+                    spin.setValue(g)
+
+        threading.Thread(target=_async, daemon=True).start()
+
+    def _apply_peq_gains(self):
+        mode = self.eq_mode
+        gains = [s.value() for s in self.peq_spins]
+
+        def _async():
+            self.hid_service.set_peq_gains(mode, gains)
+
+        threading.Thread(target=_async, daemon=True).start()
 
     def closeEvent(self, event):
         self.poll_worker.running = False
