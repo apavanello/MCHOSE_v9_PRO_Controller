@@ -5,7 +5,9 @@
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
 ![Wayland](https://img.shields.io/badge/Wayland-Hyprland-0055FF?style=for-the-badge)
 
-O **MCHOSE V9 PRO Controller (`mchose_qt.py`)** é uma aplicação desktop nativa desenvolvida em Python e PyQt6 para gerenciamento e controle completo do headset sem fio **MCHOSE V9 PRO** no Linux. O projeto oferece monitoramento de bateria em tempo real, controle de volume/microfone sincronizado com o sistema operacional, chaveamento de perfis de equalizador via comandos USB HID e suporte a conexões 2.4G e Bluetooth.
+O **MCHOSE V9 PRO Controller (`mchose_qt.py`)** é uma aplicação desktop nativa desenvolvida em Python e PyQt6 para gerenciamento e controle completo dos headsets sem fio **MCHOSE V9 PRO** e **MCHOSE V9 Pro 2** no Linux. O projeto oferece monitoramento de bateria em tempo real, controle de volume/microfone sincronizado com o sistema operacional, chaveamento de perfis de equalizador via comandos USB HID e suporte a conexões 2.4G e Bluetooth.
+
+> **Suporte ao V9 Pro 2:** o app detecta automaticamente qual dongle está conectado (V9 PRO original ou V9 Pro 2, chip Bestechnic). O utilitário `probe_hid.py` permite validar o protocolo HID do dongle conectado.
 
 ## Stack Técnica
 
@@ -64,12 +66,25 @@ sudo apt install python3-pyqt6 libhidapi-hidraw0 python3-dbus wireplumber alsa-u
 Para permitir que a aplicação acesse o Dongle USB em modo de usuário sem necessitar de `sudo`, crie a regra udev em `/etc/udev/rules.d/99-mchose.rules`:
 
 ```udev
+# MCHOSE V9 PRO (original)
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="291d", ATTRS{idProduct}=="385d", MODE="0666"
+
+# MCHOSE V9 Pro 2 (chip Bestechnic)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3837", ATTRS{idProduct}=="6011", MODE="0666"
 ```
 
 Em seguida, recarregue as regras de udev:
 ```bash
 sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### Sondando o Protocolo HID (ferramenta de diagnóstico)
+
+Se o app não reconhecer um novo modelo de headset, rode a sonda para verificar quais comandos o dongle aceita:
+
+```bash
+python3 probe_hid.py            # testa os dongles conhecidos
+python3 probe_hid.py 3837:6011  # força um VID:PID específico
 ```
 
 ### Executando a Aplicação

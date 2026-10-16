@@ -53,6 +53,13 @@ except ImportError:
     HAS_DBUS = False
 
 
+# Supported 2.4G dongles: (vendor_id, product_id)
+SUPPORTED_DEVICES = [
+    (0x291D, 0x385D),  # MCHOSE V9 PRO (original)
+    (0x3837, 0x6011),  # MCHOSE V9 Pro 2 (bestechnic)
+]
+
+
 # Theme colors
 class Theme:
     BG = QColor("#0b0e14")
@@ -143,11 +150,18 @@ class HIDService:
         except Exception:
             self.hid = None
 
+    def _open_device(self):
+        for vid, pid in SUPPORTED_DEVICES:
+            handle = self.hid.hid_open(vid, pid, None)
+            if handle:
+                return handle
+        return None
+
     def query_status(self, current_eq_mode=0):
         if not self.hid:
             return False, 0, 0, 0
         with self._lock:
-            handle = self.hid.hid_open(0x291D, 0x385D, None)
+            handle = self._open_device()
             if not handle:
                 return False, 0, 0, 0
             battery = status_code = eq_mode = 0
@@ -187,7 +201,7 @@ class HIDService:
         if not self.hid:
             return False, mode
         with self._lock:
-            handle = self.hid.hid_open(0x291D, 0x385D, None)
+            handle = self._open_device()
             if not handle:
                 return False, mode
             new_mode = mode
@@ -217,7 +231,7 @@ class HIDService:
         if not self.hid:
             return "", ""
         with self._lock:
-            handle = self.hid.hid_open(0x291D, 0x385D, None)
+            handle = self._open_device()
             if not handle:
                 return "", ""
             fw_dongle = fw_headset = ""
