@@ -115,15 +115,9 @@ def main():
         if n > 0:
             print(f"  <- espontaneo: {n} bytes: {hexs(rbuf)}")
 
-    print("\n=== 2. Comandos do protocolo V9 PRO (report 0x55) ===")
-    r = send("bateria 55 65 01", [0x55, 0x65, 0x01])
-    if r and r[0] == 0x55 and r[1] == 0x65:
-        print(f"  *** COMPATIVEL! bateria={r[2]} status=0x{r[3]:02x} ***")
-    r = send("EQ 55 11", [0x55, 0x11])
-    if r and r[0] == 0x55 and r[1] == 0x11:
-        print(f"  *** COMPATIVEL! eq_mode={r[2]} ***")
-    send("EQ set 55 21 01 01", [0x55, 0x21, 0x01, 0x01])
-    send("EQ query apos set", [0x55, 0x11])
+    print("\n=== 2. Comandos do protocolo V9 PRO (report 0x55, somente leitura) ===")
+    send("bateria 55 65 01", [0x55, 0x65, 0x01])
+    send("EQ 55 11", [0x55, 0x11])
 
     print("\n=== 3. Sondas extras (podem nao responder) ===")
     send("ping 55 0f", [0x55, 0x0F])
@@ -142,6 +136,49 @@ def main():
         cr = (ctypes.c_char * 64).from_buffer(rb)
         n = hid.hid_get_feature_report(handle, cr, 64)
         print(f"   get_feature_report={n}: {hexs(rb)}")
+
+    print("\n=== 4. Protocolo NOVO (V9 Pro 2 / bestechnic, frame 0xAA) ===")
+
+    def xchg_new(label, cmd_type, cmd, payload=(), timeout_ms=1000):
+        # frame: AA 01 flags len ct0 ct1 cmd payload... xor(0)
+        length = len(payload) + 1
+        frame = bytearray(63)
+        frame[0], frame[1], frame[2], frame[3] = 0xAA, 0x01, 0x00, length
+        frame[4], frame[5] = cmd_type
+        frame[6] = cmd
+        frame[7 : 7 + len(payload)] = bytes(payload)
+        buf = bytearray(64)
+        buf[0] = 0x55  # report id
+        buf[1:] = frame
+        c = (ctypes.c_char * 64).from_buffer(buf)
+        n = hid.hid_write(handle, c, 64)
+        print(f"-> [{label}] (write={n}): {hexs(buf, 16)}")
+        rbuf = bytearray(64)
+        cr = (ctypes.c_char * 64).from_buffer(rbuf)
+        n = hid.hid_read_timeout(handle, cr, 64, timeout_ms)
+        if n > 0:
+            print(f"  <- [{label}] {n} bytes: {hexs(rbuf, 20)}")
+            return bytes(rbuf)
+        print(f"  <- [{label}] sem resposta")
+        return None
+
+    REQUEST = (0x00, 0x01)
+    r = xchg_new("bateria (cmd 0x0B)", REQUEST, 0x0B)
+    if r and 0xAA in r[:4]:
+        i = r.index(0xAA)
+        pay = r[i + 7 : i + 7 + max(0, r[i + 3] - 1)]
+        if len(pay) >= 2:
+            sleep, status = pay[0], pay[1]
+            print(
+                f"  *** BATERIA: {status & 0x7F}% | carregando={bool(status & 0x80)} "
+                f"| dormindo={sleep == 0} ***"
+            )
+    r = xchg_new("EQ atual (cmd 0x0C)", REQUEST, 0x0C)
+    if r and 0xAA in r[:4]:
+        i = r.index(0xAA)
+        pay = r[i + 7 : i + 7 + max(0, r[i + 3] - 1)]
+        if pay:
+            print(f"  *** EQ MODE ATUAL: {pay[0]} ***")
 
     hid.hid_close(handle)
     print("\nConcluido.")

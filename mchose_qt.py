@@ -59,6 +59,17 @@ SUPPORTED_DEVICES = [
     (0x3837, 0x6011),  # MCHOSE V9 Pro 2 (bestechnic)
 ]
 
+# Protocolo "novo" (V9 Pro 2 / bestechnic): frames 0xAA enviados no report 0x55.
+# Layout: [AA 01 flags len ct0 ct1 cmd payload... xor] — checksum opcional (flags=0).
+NEW_REQUEST = (0x00, 0x01)
+NEW_SET = (0x00, 0x02)
+NEW_NOTIFY = (0x00, 0x04)
+NEW_OTA = (0x00, 0x06)
+NEW_CMD_SET_EQ = 0x01
+NEW_CMD_GET_BATTERY = 0x0B
+NEW_CMD_GET_EQ = 0x0C
+NEW_OTA_QUERY = 0x80
+
 
 # Theme colors
 class Theme:
@@ -86,6 +97,7 @@ class HIDService:
     def __init__(self):
         self.hid = None
         self._lock = threading.Lock()
+        self.protocol = None  # None=auto-detector, "old" (V9 PRO) ou "new" (V9 Pro 2)
         self._init_hid()
 
     def _init_hid(self):
@@ -157,45 +169,184 @@ class HIDService:
                 return handle
         return None
 
+    # ---------- protocolo "novo" (V9 Pro 2 / bestechnic) ----------
+
+    def _build_frame(self, cmd_type, cmd, payload=b""):
+        frame = bytearray(63)
+        frame[0:7] = bytes(
+            [0xAA, 0x01, 0x00, len(payload) + 1, cmd_type[0], cmd_type[1], cmd]
+        )
+        frame[7 : 7 + len(payload)] = payload
+        return frame
+
+    def _xchg_new(self, handle, cmd_type, cmd, payload=b"", timeout_ms=600):
+        buf = bytearray(64)
+        buf[0] = 0x55  # report id
+        buf[1:] = self._build_frame(cmd_type, cmd, payload)
+        c = (ctypes.c_char * 64).from_buffer(buf)
+        if self.hid.hid_write(handle, c, 64) <= 0:
+            return None
+        rbuf = bytearray(64)
+        cr = (ctypes.c_char * 64).from_buffer(rbuf)
+        n = self.hid.hid_read_timeout(handle, cr, 64, timeout_ms)
+        if n <= 0:
+            return None
+        data = bytes(rbuf[:n])
+        # a resposta chega com o report id no primeiro byte; localiza o magic 0xAA
+        i = data.find(b"\xAA")
+        if i < 0 or len(data) < i + 8:
+            return None
+        if tuple(data[i + 4 : i + 6]) not in (
+            NEW_REQUEST,
+            NEW_SET,
+            NEW_NOTIFY,
+            NEW_OTA,
+        ):
+            return None
+        if data[i + 6] != cmd:
+            return None
+        length = data[i + 3]
+        return data[i + 7 : i + 7 + max(0, length - 1)]
+
+    def _query_status_new(self, handle, current_eq_mode):
+        pay = self._xchg_new(handle, NEW_REQUEST, NEW_CMD_GET_BATTERY)
+        if pay is None or len(pay) < 2:
+            return None
+        sleep_state, status = pay[0], pay[1]
+        battery = status & 0x7F
+        charging = 1 if (status & 0x80) else 0
+        eq_mode = current_eq_mode
+        pay2 = self._xchg_new(handle, NEW_REQUEST, NEW_CMD_GET_EQ)
+        if pay2:
+            eq_mode = pay2[0]
+        return True, battery, charging, eq_mode
+
+    def _send_eq_new(self, handle, mode):
+        if self._xchg_new(handle, NEW_SET, NEW_CMD_SET_EQ, bytes([mode & 0xFF])) is None:
+            return False, mode
+        confirm = self._xchg_new(handle, NEW_REQUEST, NEW_CMD_GET_EQ)
+        if confirm:
+            return True, confirm[0]
+        return True, mode
+
+    def _get_firmware_new(self, handle):
+        versions = []
+        for target in (0x00, 0x01):  # headset, dongle
+            pay = self._xchg_new(handle, NEW_OTA, target, bytes([NEW_OTA_QUERY]))
+            if pay and len(pay) >= 5:
+                versions.append(
+                    "".join(f"{b:02x}" for b in pay[-4:]).upper()[-4:]
+                )
+            else:
+                versions.append("")
+        return versions[1], versions[0]  # dongle, headset
+
+    # ---------- protocolo "antigo" (V9 PRO original) ----------
+
+    def _query_status_old(self, handle, current_eq_mode):
+        battery = status_code = eq_mode = 0
+        ok_bat = ok_eq = False
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2] = 0x55, 0x65, 0x01
+            c_buf = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_write(handle, c_buf, 64) > 0:
+                rbuf = bytearray(64)
+                c_r = (ctypes.c_char * 64).from_buffer(rbuf)
+                if self.hid.hid_read_timeout(handle, c_r, 64, 500) > 0:
+                    d = list(rbuf)
+                    if d[0] == 0x55 and d[1] == 0x65:
+                        battery, status_code = d[2], d[3]
+                        ok_bat = True
+            buf2 = bytearray(64)
+            buf2[0], buf2[1] = 0x55, 0x11
+            c2 = (ctypes.c_char * 64).from_buffer(buf2)
+            if self.hid.hid_write(handle, c2, 64) > 0:
+                r2 = bytearray(64)
+                c_r2 = (ctypes.c_char * 64).from_buffer(r2)
+                if self.hid.hid_read_timeout(handle, c_r2, 64, 500) > 0:
+                    d2 = list(r2)
+                    if d2[0] == 0x55 and d2[1] == 0x11:
+                        eq_mode = d2[2]
+                        ok_eq = True
+        except Exception:
+            pass
+        if ok_bat:
+            return True, battery, status_code, eq_mode if ok_eq else current_eq_mode
+        return None
+
+    def _send_eq_old(self, handle, mode):
+        new_mode = mode
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2], buf[3] = 0x55, 0x21, 0x01, mode
+            c = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_write(handle, c, 64) <= 0:
+                return False, mode
+            time.sleep(0.05)
+            q = bytearray(64)
+            q[0], q[1] = 0x55, 0x11
+            cq = (ctypes.c_char * 64).from_buffer(q)
+            self.hid.hid_write(handle, cq, 64)
+            rb = bytearray(64)
+            cr = (ctypes.c_char * 64).from_buffer(rb)
+            if self.hid.hid_read_timeout(handle, cr, 64, 300) > 2:
+                if rb[0] == 0x55 and rb[1] == 0x11:
+                    new_mode = int(rb[2])
+            return True, new_mode
+        except Exception:
+            return False, mode
+
+    def _get_firmware_old(self, handle):
+        fw_dongle = fw_headset = ""
+        try:
+            buf = bytearray(64)
+            buf[0], buf[1], buf[2] = 0xAA, 0x01, 0x00
+            c = (ctypes.c_char * 64).from_buffer(buf)
+            if self.hid.hid_send_feature_report(handle, c, 64) <= 0:
+                return "", ""
+            for delay in (0.3, 0.5, 0.9):
+                time.sleep(delay)
+                rb = bytearray(64)
+                rb[0] = 0xAA
+                c_r = (ctypes.c_char * 64).from_buffer(rb)
+                if self.hid.hid_get_feature_report(handle, c_r, 64) > 0:
+                    d = list(rb)
+                    if d[0] == 0xAA:
+                        if len(d) >= 10:
+                            fw_dongle = f"{d[8]:02d}{d[9]:02d}"
+                        if len(d) >= 12:
+                            fw_headset = f"{d[10]:02d}{d[11]:02d}"
+                        break
+        except Exception:
+            pass
+        return fw_dongle, fw_headset
+
+    # ---------- API (despacho por protocolo) ----------
+
     def query_status(self, current_eq_mode=0):
         if not self.hid:
             return False, 0, 0, 0
         with self._lock:
             handle = self._open_device()
             if not handle:
+                self.protocol = None
                 return False, 0, 0, 0
-            battery = status_code = eq_mode = 0
-            ok_bat = ok_eq = False
             try:
-                buf = bytearray(64)
-                buf[0], buf[1], buf[2] = 0x55, 0x65, 0x01
-                c_buf = (ctypes.c_char * 64).from_buffer(buf)
-                if self.hid.hid_write(handle, c_buf, 64) > 0:
-                    rbuf = bytearray(64)
-                    c_r = (ctypes.c_char * 64).from_buffer(rbuf)
-                    if self.hid.hid_read_timeout(handle, c_r, 64, 500) > 0:
-                        d = list(rbuf)
-                        if d[0] == 0x55 and d[1] == 0x65:
-                            battery, status_code = d[2], d[3]
-                            ok_bat = True
-                buf2 = bytearray(64)
-                buf2[0], buf2[1] = 0x55, 0x11
-                c2 = (ctypes.c_char * 64).from_buffer(buf2)
-                if self.hid.hid_write(handle, c2, 64) > 0:
-                    r2 = bytearray(64)
-                    c_r2 = (ctypes.c_char * 64).from_buffer(r2)
-                    if self.hid.hid_read_timeout(handle, c_r2, 64, 500) > 0:
-                        d2 = list(r2)
-                        if d2[0] == 0x55 and d2[1] == 0x11:
-                            eq_mode = d2[2]
-                            ok_eq = True
-            except Exception:
-                pass
+                if self.protocol != "old":
+                    result = self._query_status_new(handle, current_eq_mode)
+                    if result is not None:
+                        self.protocol = "new"
+                        return result
+                    if self.protocol == "new":
+                        self.protocol = None  # dongle novo sumiu; redetectar
+                        return False, 0, 0, 0
+                result = self._query_status_old(handle, current_eq_mode)
+                if result is not None:
+                    self.protocol = "old"
+                return result if result is not None else (False, 0, 0, 0)
             finally:
                 self.hid.hid_close(handle)
-            if ok_bat:
-                return True, battery, status_code, eq_mode if ok_eq else current_eq_mode
-            return False, 0, 0, 0
 
     def send_eq_command(self, mode):
         if not self.hid:
@@ -204,26 +355,16 @@ class HIDService:
             handle = self._open_device()
             if not handle:
                 return False, mode
-            new_mode = mode
             try:
-                buf = bytearray(64)
-                buf[0], buf[1], buf[2], buf[3] = 0x55, 0x21, 0x01, mode
-                c = (ctypes.c_char * 64).from_buffer(buf)
-                if self.hid.hid_write(handle, c, 64) <= 0:
-                    return False, mode
-                time.sleep(0.05)
-                q = bytearray(64)
-                q[0], q[1] = 0x55, 0x11
-                cq = (ctypes.c_char * 64).from_buffer(q)
-                self.hid.hid_write(handle, cq, 64)
-                rb = bytearray(64)
-                cr = (ctypes.c_char * 64).from_buffer(rb)
-                if self.hid.hid_read_timeout(handle, cr, 64, 300) > 2:
-                    if rb[0] == 0x55 and rb[1] == 0x11:
-                        new_mode = int(rb[2])
-                return True, new_mode
-            except Exception:
-                return False, mode
+                if self.protocol == "new":
+                    return self._send_eq_new(handle, mode)
+                if self.protocol == "old":
+                    return self._send_eq_old(handle, mode)
+                # protocolo ainda desconhecido: tenta trocar direto no novo
+                result = self._send_eq_new(handle, mode)
+                if result[0]:
+                    self.protocol = "new"
+                return result
             finally:
                 self.hid.hid_close(handle)
 
@@ -234,31 +375,14 @@ class HIDService:
             handle = self._open_device()
             if not handle:
                 return "", ""
-            fw_dongle = fw_headset = ""
             try:
-                buf = bytearray(64)
-                buf[0], buf[1], buf[2] = 0xAA, 0x01, 0x00
-                c = (ctypes.c_char * 64).from_buffer(buf)
-                if self.hid.hid_send_feature_report(handle, c, 64) <= 0:
-                    return "", ""
-                for delay in (0.3, 0.5, 0.9):
-                    time.sleep(delay)
-                    rb = bytearray(64)
-                    rb[0] = 0xAA
-                    c_r = (ctypes.c_char * 64).from_buffer(rb)
-                    if self.hid.hid_get_feature_report(handle, c_r, 64) > 0:
-                        d = list(rb)
-                        if d[0] == 0xAA:
-                            if len(d) >= 10:
-                                fw_dongle = f"{d[8]:02d}{d[9]:02d}"
-                            if len(d) >= 12:
-                                fw_headset = f"{d[10]:02d}{d[11]:02d}"
-                            break
-            except Exception:
-                pass
+                if self.protocol == "new":
+                    return self._get_firmware_new(handle)
+                if self.protocol == "old":
+                    return self._get_firmware_old(handle)
+                return "", ""
             finally:
                 self.hid.hid_close(handle)
-            return fw_dongle, fw_headset
 
 
 class AudioService:
@@ -948,6 +1072,7 @@ class MChoseMainWindow(QMainWindow):
         self._mic_anim = None
         self._ignore_mic_slider_event = False
         self._ignore_vol_slider_event = False
+        self._eq_labels_applied = None
 
         self._init_ui()
         self._apply_stylesheet()
@@ -1236,7 +1361,22 @@ class MChoseMainWindow(QMainWindow):
         """
         )
 
+    def _apply_eq_labels(self):
+        proto = self.hid_service.protocol
+        if proto == self._eq_labels_applied:
+            return
+        # V9 Pro 2 tem tres perfis de jogo; o V9 PRO original tem jogo1/jogo2/musica
+        labels = (
+            ["Jogo 1", "Jogo 2", "Jogo 3"]
+            if proto == "new"
+            else ["Jogo 1", "Jogo 2", "Música"]
+        )
+        for btn, text in zip(self.eq_buttons, labels):
+            btn.setText(text)
+        self._eq_labels_applied = proto
+
     def _on_poll_done(self, ok, bat, sc, eq, fd, fh):
+        self._apply_eq_labels()
         if ok:
             self.connected = True
             self.connection_mode = "2.4G"

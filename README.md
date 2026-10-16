@@ -7,7 +7,23 @@
 
 O **MCHOSE V9 PRO Controller (`mchose_qt.py`)** é uma aplicação desktop nativa desenvolvida em Python e PyQt6 para gerenciamento e controle completo dos headsets sem fio **MCHOSE V9 PRO** e **MCHOSE V9 Pro 2** no Linux. O projeto oferece monitoramento de bateria em tempo real, controle de volume/microfone sincronizado com o sistema operacional, chaveamento de perfis de equalizador via comandos USB HID e suporte a conexões 2.4G e Bluetooth.
 
-> **Suporte ao V9 Pro 2:** o app detecta automaticamente qual dongle está conectado (V9 PRO original ou V9 Pro 2, chip Bestechnic). O utilitário `probe_hid.py` permite validar o protocolo HID do dongle conectado.
+> **Suporte ao V9 Pro 2:** o app detecta automaticamente qual dongle está conectado (V9 PRO original ou V9 Pro 2, chip Bestechnic) e usa o protocolo correto para cada um. O utilitário `probe_hid.py` permite diagnosticar o dongle conectado (somente leitura — não altera nada no headset).
+
+## Protocolos suportados
+
+**V9 PRO (original, dongle `291d:385d`):** pacotes `[0x55, cmd, ...]` — bateria `55 65 01`, EQ `55 11` / `55 21 01 <modo>`, firmware via feature report `0xAA`.
+
+**V9 Pro 2 (Bestechnic, dongle `3837:6011`):** frames de 63 bytes no report `0x55` com a estrutura:
+
+```
+[0]=0xAA  [1]=0x01  [2]=flags  [3]=len  [4:6]=tipo  [6]=cmd  [7:]=payload  [..]=xor
+tipo: 00 01 (request/response) · 00 02 (set) · 00 04 (notify) · 00 06 (OTA)
+cmd:  01 set EQ · 0B bateria · 0C EQ atual · 04 estado PEQ · 50 OTA query
+bateria (payload de resposta): [acordado, status] — status&0x7F = %, bit7 = carregando
+modos de EQ: 0=Jogo 1 · 1=Jogo 2 · 2=Jogo 3
+```
+
+Protocolo documentado por engenharia reversa do código do hub oficial (renderer WebHID em `cdn.mchose.com.cn`) — sem USB sniffing necessário.
 
 ## Stack Técnica
 

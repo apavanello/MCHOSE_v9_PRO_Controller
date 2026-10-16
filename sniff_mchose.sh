@@ -8,7 +8,7 @@
 set -e
 
 DUR=${1:-60}
-OUT=/tmp/mchose_usb_sniff.txt
+OUT="$PWD/mchose_usb_sniff.txt"
 DEV=${DEV:-3837:6011}
 
 # descobre o barramento onde o dongle esta (fallback: 3)
@@ -27,6 +27,7 @@ echo "Capturando barramento USB $BUS por ${DUR}s -> $OUT"
 echo "Use o hub da MCHOSE AGORA ( headset ligado em 2.4G ). Ctrl+C para parar."
 echo "-------------------------------------------------------------"
 
+rm -f "$OUT"
 timeout --signal=INT "${DUR}" cat "$MON" | tee "$OUT" >/dev/null || true
 
 chown "${SUDO_USER:-$USER}" "$OUT" 2>/dev/null || true
